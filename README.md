@@ -4,8 +4,8 @@
 
 
 ## Contents
-- Requirements
-- Usage
+- [Requirements](https://github.com/yeeus/genome_assessment_tool#requirements)
+- [Usage](https://github.com/yeeus/genome_assessment_tool#usage)
 
 
 ### Requirements
