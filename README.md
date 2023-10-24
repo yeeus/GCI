@@ -19,9 +19,9 @@ As for .., it just needs:
 - python3.*
 
 ### Usage
-1. Prepare HiFi and/or UL mapping files (using [minimap2](https://github.com/lh3/minimap2) and [winnowmap](https://github.com/marbl/Winnowmap)) for two haplotypes
+1. Prepare HiFi and/or UL mapping files (using [minimap2](https://github.com/lh3/minimap2) and [winnowmap](https://github.com/marbl/Winnowmap)) for two haplotypes (if don't have the parental sequencing data, we suggest to use [canu](https://github.com/marbl/canu) for binning)
 ```
-# mapping maternal-specific HiFi and/or UL reads with minimap2
+# mapping maternal-specific HiFi and/or UL reads with minimap2 
 minimap2 -t $threads -ax map-hifi $mat_asm $mat_hifi > ${mat.minimap2.hifi.sam}   ## mapping UL reads with -ax map-ont
 
 samtools view -@ $threads -Sb ${mat.minimap2.hifi.sam} | samtools sort -@ $threads -o ${mat.minimap2.hifi.bam}
