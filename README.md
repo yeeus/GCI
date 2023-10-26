@@ -12,6 +12,7 @@
 For the complete pipeline, there are several necessary softwares:
 
 - [canu](https://github.com/marbl/canu)
+- seqkit
 - [minimap2](https://github.com/lh3/minimap2)
 - [winnowmap](https://github.com/marbl/Winnowmap)
 - paftools.js
@@ -31,9 +32,15 @@ canu -haplotype \
     -haplotypeMat $mat \
     -pacbio-hifi $hifi \   ## binning ul reads with -nanopore $ul
     useGrid=false
+
+# because there would be unknown reads which could't be reliably binned, we suggest to combine them with haplotype-specific reads
+seqkit shuffle -2 -o ${canu_unknown_shuffle.fa.gz} -j $threads ${canu_unknown.fa.gz}
+seqkit split2 ${canu_unknown_shuffle.fa.gz} -p 2 -j $threads
+cat ${canu_mat.fa.gz} ${canu_unknown_shuffle.part_001.fa.gz} > ${canu_mat.final.fa.gz}
+cat ${canu_pat.fa.gz} ${canu_unknown_shuffle.part_002.fa.gz} > ${canu_pat.final.fa.gz}
 ```
 
-2. Map HiFi and/or UL reads to assemblies (using minimap2 and winnowmap) for two haplotypes
+2. Map HiFi and/or UL reads to assemblies (using minimap2 and winnowmap)
 ```
 # minimap2 
 minimap2 -t $threads -ax map-hifi $mat_asm $mat_hifi > ${mat.minimap2.hifi.sam}   ## mapping UL reads with -ax map-ont
