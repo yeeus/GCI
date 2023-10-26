@@ -11,24 +11,38 @@
 ### Requirements
 For the complete pipeline, there are several necessary softwares:
 
-- minimap2
-- winnowmap
+- [canu](https://github.com/marbl/canu)
+- [minimap2](https://github.com/lh3/minimap2)
+- [winnowmap](https://github.com/marbl/Winnowmap)
 - paftools.js
 
 As for .., it just needs:
 - python3.*
 
 ### Usage
-1. Prepare HiFi and/or UL mapping files (using [minimap2](https://github.com/lh3/minimap2) and [winnowmap](https://github.com/marbl/Winnowmap)) for two haplotypes (if don't have the parental sequencing data, we suggest to use [canu](https://github.com/marbl/canu) for binning)
+1. Prepare parental (specific) reads (if parental sequencing data are accessible, please skip this step) 
 ```
-# mapping maternal-specific HiFi and/or UL reads with minimap2 
+# we suggest to use canu for binning
+canu -haplotype \
+    -p $prefix -d $dictionary \
+    genomeSize=3g \
+    maxThreads=$threads \
+    -haplotypePat $pat \
+    -haplotypeMat $mat \
+    -pacbio-hifi $hifi \   ## binning ul reads with -nanopore $ul
+    useGrid=false
+```
+
+2. Map HiFi and/or UL reads to assemblies (using minimap2 and winnowmap) for two haplotypes
+```
+# minimap2 
 minimap2 -t $threads -ax map-hifi $mat_asm $mat_hifi > ${mat.minimap2.hifi.sam}   ## mapping UL reads with -ax map-ont
 
 samtools view -@ $threads -Sb ${mat.minimap2.hifi.sam} | samtools sort -@ $threads -o ${mat.minimap2.hifi.bam}
 paftools.js sam2paf ${mat.minimap2.hifi.sam} > ${mat.minimap2.hifi.paf}
 
 
-# mapping maternal-specific HiFi and/or UL reads with winnowmap
+# winnowmap
 meryl count k=15 output $mat_merylDB $mat_asm
 meryl print greater-than distinct=0.9998 $mat_merylDB > $mat_repetitive_k15.txt
 winnowmap -W $mat_repetitive_k15.txt -ax map-pb $mat_asm $mat_hifi > ${mat.winnowmap.hifi.sam}   ## mapping UL reads with -ax map-ont
@@ -37,4 +51,4 @@ samtools view -@ $threads -Sb ${mat.winnowmap.hifi.sam} | samtools sort -@ $thre
 paftools.js sam2paf ${mat.winnowmap.hifi.sam} > ${mat.winnowmap.hifi.paf}
 ```
 
-2. Filter the mapping files
+3. Filter the mapping files
