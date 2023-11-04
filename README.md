@@ -1,4 +1,4 @@
-# genome_assessment_tool
+# Genome Continuity Index
 ![7fe814001fd9da8e1ef94fb3f386129](https://github.com/yeeus/genome_assessment_tool/assets/118142448/75b978b6-a29f-4ade-b9c2-51a1c0ff60b0)
 
 
@@ -17,8 +17,11 @@ For the complete pipeline, there are several necessary softwares:
 - [winnowmap](https://github.com/marbl/Winnowmap)
 - paftools.js
 
-As for .., it just needs:
+As for GCI, it just needs:
 - python3.*
+- pysam
+- numpy
+- karyotypeR (just required for plotting)
 
 ### Usage
 1. Prepare parental (specific) reads (if parental sequencing data are accessible, please skip this step) 
