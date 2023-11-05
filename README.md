@@ -17,23 +17,23 @@ For the complete pipeline, there are several necessary softwares:
 - [winnowmap](https://github.com/marbl/Winnowmap)
 - paftools.js
 
-As for GCI, it just needs:
+As for **GCI**, it just needs:
 - python3.*
 - pysam
 - numpy
 - karyotypeR (just required for plotting)
 
 ### Usage
-1. Prepare parental (specific) reads (if parental sequencing data are accessible, please skip this step) 
+1. Prepare parental (specific) reads (if parental sequencing data are available, please skip this step) 
 ```
-# we suggest to use canu for binning
+# we recommend to use canu for binning
 canu -haplotype \
     -p $prefix -d $dictionary \
     genomeSize=3g \
     maxThreads=$threads \
     -haplotypePat $pat \
     -haplotypeMat $mat \
-    -pacbio-hifi $hifi \   ## binning ul reads with -nanopore $ul
+    -pacbio-hifi $hifi \   ## binning ONT reads with -nanopore $ont
     useGrid=false
 
 # because there would be unknown reads which could't be reliably binned, we suggest to combine them with haplotype-specific reads
@@ -43,22 +43,30 @@ cat ${canu_mat.fa.gz} ${canu_unknown_shuffle.part_001.fa.gz} > ${canu_mat.final.
 cat ${canu_pat.fa.gz} ${canu_unknown_shuffle.part_002.fa.gz} > ${canu_pat.final.fa.gz}
 ```
 
-2. Map HiFi and/or UL reads to assemblies (using minimap2 and winnowmap)
+2. Map HiFi and/or ONT reads to assemblies (using minimap2 and winnowmap)
 ```
 # minimap2 
-minimap2 -t $threads -ax map-hifi $mat_asm $mat_hifi > ${mat.minimap2.hifi.sam}   ## mapping UL reads with -ax map-ont
+minimap2 -t $threads -ax map-hifi $mat_asm $mat_hifi > ${mat.minimap2.hifi.sam}   ## mapping ONT reads with -ax map-ont
 
 samtools view -@ $threads -Sb ${mat.minimap2.hifi.sam} | samtools sort -@ $threads -o ${mat.minimap2.hifi.bam}
+samtools index ${mat.minimap2.hifi.bam} ## this is necessary!!!
 paftools.js sam2paf ${mat.minimap2.hifi.sam} | sort -k6,6V -k8,8n -k1,1 > ${mat.minimap2.hifi.paf}
 
 
 # winnowmap
 meryl count k=15 output $mat_merylDB $mat_asm
 meryl print greater-than distinct=0.9998 $mat_merylDB > $mat_repetitive_k15.txt
-winnowmap -W $mat_repetitive_k15.txt -ax map-pb $mat_asm $mat_hifi > ${mat.winnowmap.hifi.sam}   ## mapping UL reads with -ax map-ont
+winnowmap -W $mat_repetitive_k15.txt -ax map-pb $mat_asm $mat_hifi > ${mat.winnowmap.hifi.sam}   ## mapping ONT reads with -ax map-ont
 
 samtools view -@ $threads -Sb ${mat.winnowmap.hifi.sam} | samtools sort -@ $threads -o ${mat.winnowmap.hifi.bam}
+samtools index ${mat.minimap2.hifi.bam} ## this is necessary!!!
 paftools.js sam2paf ${mat.winnowmap.hifi.sam} | sort -k6,6V -k8,8n -k1,1 > ${mat.winnowmap.hifi.paf}
 ```
 
 3. Filter the mapping files
+
+We recommend to input alignment files generated from different softwares (minimap2 and winnowmap) using the same set of long reads. **Importantly,** there needs at least one bam file for one type of long reads.
+```
+# Before this, make sure you've generated the index file (.bai) for bam files
+python GCI.py --hifi hifi.bam hifi.paf ... --nano ont.bam ont.paf ...
+```
