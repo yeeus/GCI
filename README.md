@@ -50,8 +50,7 @@ minimap2 -t $threads -ax map-hifi $mat_asm $mat_hifi > ${mat.minimap2.hifi.sam} 
 
 samtools view -@ $threads -Sb ${mat.minimap2.hifi.sam} | samtools sort -@ $threads -o ${mat.minimap2.hifi.bam}
 samtools index ${mat.minimap2.hifi.bam} ## this is necessary!!!
-paftools.js sam2paf ${mat.minimap2.hifi.sam} | sort -k6,6V -k8,8n -k1,1 > ${mat.minimap2.hifi.paf}
-
+paftools.js sam2paf ${mat.minimap2.hifi.sam} | sort -k6,6V -k8,8n > ${mat.minimap2.hifi.paf} ## please sort the paf file because our program don't automatically sort the file by the targets name!
 
 # winnowmap
 meryl count k=15 output $mat_merylDB $mat_asm
@@ -60,7 +59,7 @@ winnowmap -W $mat_repetitive_k15.txt -ax map-pb $mat_asm $mat_hifi > ${mat.winno
 
 samtools view -@ $threads -Sb ${mat.winnowmap.hifi.sam} | samtools sort -@ $threads -o ${mat.winnowmap.hifi.bam}
 samtools index ${mat.minimap2.hifi.bam} ## this is necessary!!!
-paftools.js sam2paf ${mat.winnowmap.hifi.sam} | sort -k6,6V -k8,8n -k1,1 > ${mat.winnowmap.hifi.paf}
+paftools.js sam2paf ${mat.winnowmap.hifi.sam} | sort -k6,6V -k8,8n > ${mat.winnowmap.hifi.paf} ## please sort the paf file because our program don't automatically sort the file by the targets name!
 ```
 
 3. Filter the mapping files
@@ -68,5 +67,6 @@ paftools.js sam2paf ${mat.winnowmap.hifi.sam} | sort -k6,6V -k8,8n -k1,1 > ${mat
 We recommend to input alignment files generated from different softwares (minimap2 and winnowmap) using the same set of long reads. **Importantly,** there needs at least one bam file for one type of long reads.
 ```
 # Before this, make sure you've generated the index file (.bai) for bam files
+# and we recommend to input one bam and one paf file produced by two softwares
 python GCI.py --hifi hifi.bam hifi.paf ... --nano ont.bam ont.paf ...
 ```
