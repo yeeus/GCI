@@ -13,7 +13,9 @@ Genome Continuity Index (GCI) is a program for assessing the T2T genome, which h
 - [Parameters](https://github.com/yeeus/genome_assessment_tool#parameters)
 - [Usage](https://github.com/yeeus/genome_assessment_tool#usage)
 - [Outputs](https://github.com/yeeus/genome_assessment_tool#outputs)
-- [Cite](https://github.com/yeeus/genome_assessment_tool#cite)
+- [Citation](https://github.com/yeeus/genome_assessment_tool#citation)
+- [Help](https://github.com/yeeus/genome_assessment_tool#help)
+- [To do](https://github.com/yeeus/genome_assessment_tool#to-do)
 
 ### Requirements
 For the complete pipeline, there are several necessary softwares:
@@ -28,7 +30,7 @@ As for **GCI**, it requires:
 - python3.*
 - pysam
 - numpy
-- karyotypeR (for plotting)
+- karyotypeR (for plotting) ###
 
 ### Parameters
 ```
@@ -123,4 +125,17 @@ python GCI.py --hifi hifi.bam hifi.paf (--nano ont.bam ont.paf) ## v.1.0 can onl
     - ${prefix}.${threshold}.depth.bed ## the merged depth file in bed format
     - ${prefix}.gci ## an index file containing the original N50, new N50, genome continuity index
 
-### Cite
+### Citation
+
+
+### Help
+If you get any problems, please raise an [issue](https://github.com/yeeus/GCI/issues) first.
+For another helps, please contact quanyu_chen@outlook.com.
+
+
+### To do
+- visualization
+- contribution for N50 per chromosome
+- bam + bam
+- ONT intergration
+- multiple threads
