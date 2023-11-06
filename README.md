@@ -143,3 +143,7 @@ For another helps, please contact quanyu_chen@outlook.com.
   - clip_percent: 0.05, 0.1, 0.2
   - flank_len: 10, 20, 50
   - performance: distribution, index
+- edit the function (compute_index)
+  - formula
+  - merge gaps for calculating the number of contigs
+- simulated
