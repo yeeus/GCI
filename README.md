@@ -9,13 +9,13 @@ Genome Continuity Index (GCI) is a program for assessing the T2T genome, which h
 
 
 ## Contents
-- [Requirements](https://github.com/yeeus/genome_assessment_tool#requirements)
-- [Parameters](https://github.com/yeeus/genome_assessment_tool#parameters)
-- [Usage](https://github.com/yeeus/genome_assessment_tool#usage)
-- [Outputs](https://github.com/yeeus/genome_assessment_tool#outputs)
-- [Citation](https://github.com/yeeus/genome_assessment_tool#citation)
-- [Help](https://github.com/yeeus/genome_assessment_tool#help)
-- [To do](https://github.com/yeeus/genome_assessment_tool#to-do)
+- [Requirements](https://github.com/yeeus/GCI#requirements)
+- [Parameters](https://github.com/yeeus/GCI#parameters)
+- [Usage](https://github.com/yeeus/GCI#usage)
+- [Outputs](https://github.com/yeeus/GCI#outputs)
+- [Citation](https://github.com/yeeus/GCI#citation)
+- [Help](https://github.com/yeeus/GCI#help)
+- [To do](https://github.com/yeeus/GCI#to-do)
 
 ### Requirements
 For the complete pipeline, there are several necessary softwares:
@@ -36,14 +36,14 @@ As for **GCI**, it requires:
 ```
 python GCI.py --help
 
-usage: ../GCI.py [--hifi  [...]] [--nano  [...]] [-d [PATH]] [-o [STR]] [-t [INT]] [-mq [INT]] [-ip [FLOAT]] [-op [FLOAT]] [-cp [FLOAT]] [-fl [INT]]
+usage: ../GCI.py [--hifi FILE FILE] [--nano FILE FILE] [-d [PATH]] [-o [STR]] [-t [INT]] [-mq [INT]] [-ip [FLOAT]] [-op [FLOAT]] [-cp [FLOAT]] [-fl [INT]]
                  [-ts [INT]] [-f] [-p] [-h] [-v]
 
 A program for assessing the T2T genome
 
 Input/Output:
-  --hifi  [ ...]        PacBio HiFi reads alignment files (.bam and/or .paf) including at least one bam file
-  --nano  [ ...]        Oxford Nanopore long reads alignment files (.bam and/or .paf) including at least one bam file
+  --hifi FILE FILE      PacBio HiFi reads alignment files (.bam and/or .paf) including at least one bam file
+  --nano FILE FILE      Oxford Nanopore long reads alignment files (.bam and/or .paf) including at least one bam file
   -d [PATH]             The dictionary of output files [.]
   -o [STR], --output [STR]
                         Prefix of output files [GCI]
@@ -139,3 +139,7 @@ For another helps, please contact quanyu_chen@outlook.com.
 - bam + bam
 - ONT intergration
 - multiple threads
+- benchmark
+  - clip_percent: 0.05, 0.1, 0.2
+  - flank_len: 10, 20, 50
+  - performance: distribution, index
