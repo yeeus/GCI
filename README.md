@@ -121,3 +121,6 @@ python GCI.py --hifi hifi.bam hifi.paf (--nano ont.bam ont.paf) ## v.1.0 can onl
     - ${prefix}.depth ## the whole-genome depth file
     - ${prefix}.${threshold}.depth.bed ## the merged depth file in bed format
     - ${prefix}.gci ## an index file containing the original N50, new N50, genome continuity index
+
+### Cite
+XXXXX
