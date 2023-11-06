@@ -158,7 +158,7 @@ def compute_index(targets_length={}, prefix='GCI', dictionary='.', force=False, 
 
 	usage: remove the regions with depth lower than the threshold and compute the index
 		   
-	output: a file containing the original N50, new N50, index
+	output: an index file containing the original N50, new N50, genome continuity index
 	"""
 
 	origin_lengths = sorted([length for length in targets_length.values()], reverse=True)
@@ -258,7 +258,7 @@ if __name__=='__main__':
 	######################
 	version = '1.0'
 
-	parser = argparse.ArgumentParser(prog=sys.argv[0], add_help=False, formatter_class=argparse.RawDescriptionHelpFormatter, description='A program for assessing the T2T genome', epilog='Examples:\npython GCI.py --hifi hifi.bam hifi.paf ... --nano ont.bam ont.paf ...')
+	parser = argparse.ArgumentParser(prog=sys.argv[0], add_help=False, formatter_class=argparse.RawDescriptionHelpFormatter, description='A program for assessing the T2T genome', epilog='Examples:\npython GCI.py --hifi hifi.bam hifi.paf --nano ont.bam ont.paf')
 
 	group_io = parser.add_argument_group("Input/Output")
 	group_io.add_argument('--hifi', nargs='+', metavar='', help='PacBio HiFi reads alignment files (.bam and/or .paf) including at least one bam file')
@@ -282,7 +282,7 @@ if __name__=='__main__':
 	group_op.add_argument('-v', '--version', action="version", version=version, help="Show program's version number and exit")
 	
 	args = vars(parser.parse_args())
-	print(args)
+	#print(args)
 
 
 	if (args['hifi'] == None) and (args['nano'] == None):
