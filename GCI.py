@@ -7,12 +7,11 @@ import os
 import math
 
 
-def filter_paf_bam(paf_file='', bam_file='', prefix='GCI', map_qual=30, iden_percent=0.9, clip_percent=0.1, ovlp_percent=0.9, flank_len=10, dictionary='.', force=False):
+def filter_bam(bam_files=[], prefix='GCI', map_qual=30, iden_percent=0.9, clip_percent=0.1, ovlp_percent=0.9, flank_len=10, directory='.', force=False, generate=False):
 	"""
-	usage: filter the paf and bam file based on many metrics, and finally generate the depth file
+	usage: filter the bam file(s) based on many metrics(, and finally generate the depth file)
 
-	input: paf file,
-		   bam file,
+	input: bam file(s),
 		   the prefix of output depth file,
 		   the filtered mapping quality,
 		   the filtered identity percentage,
@@ -20,117 +19,81 @@ def filter_paf_bam(paf_file='', bam_file='', prefix='GCI', map_qual=30, iden_per
 		   the filtered overlapping percentage (overlap/length),
 		   the length of flanking bases ([start + num, end - num + 1]),
 		   the path to output,
-		   whether to rewrite the existing files (force)
+		   whether to rewrite the existing files (force),
+		   whether to generate the depth file
 
-	output: the whole-genome depth file
-
-	return: the whole-genome depth dictionary,
-			one dictionary keyed by the targets with the length value
-	"""
-
-	if os.path.exists(f'{dictionary}/{prefix}.depth') and force == False:
-		print(f'ERROR!!! The file "{dictionary}/{prefix}.depth" exists\nPlease using "-f" or "--force" to rewrite', file=sys.stderr)
-		raise SystemExit
-	
-	
-	paf_lines = {}
-	depths = {}
-	targets_length = {}
-	with open(paf_file, 'r') as f:
-		for line in f:
-			paf = line.strip().split("\t")
-			query = paf[0]
-			target = paf[5]
-			target_length = int(paf[6])
-			start = int(paf[7])
-			end = int(paf[8])
-			num_match_res = int(paf[9])
-			len_aln = int(paf[10])
-			mapq = int(paf[11])
-
-			if (mapq >= map_qual) and (num_match_res/len_aln >= iden_percent):
-				paf_lines[query] = (target, start, end)
-
-			if target not in depths.keys():
-				depths[target] = np.zeros(target_length, dtype=int)
-
-			if target not in targets_length.keys():
-				targets_length[target] = target_length
-	
-
-	samfile = pysam.AlignmentFile(bam_file, 'rb')
-	for segment in samfile.fetch():
-		if segment.query_name in paf_lines:
-			if (segment.is_mapped == True) and (segment.is_secondary == False) and (segment.is_supplementary == False) and (segment.mapping_quality >= map_qual) and (segment.reference_name == paf_lines[segment.query_name][0]):
-				S = segment.get_cigar_stats()[0][4]
-				if S/segment.query_length <= clip_percent:
-					paf_start = paf_lines[segment.query_name][1]
-					paf_end = paf_lines[segment.query_name][2]
-					sam_start = segment.reference_start
-					sam_end = segment.reference_end
-
-					ovlp = min(paf_end, sam_end) - max(paf_start, sam_start)
-					if ovlp/segment.query_length >= ovlp_percent:
-						start = max(paf_start, sam_start) + flank_len
-						end = min(paf_end, sam_end) - flank_len
-						depths[segment.reference_name][start:end+1] += 1
-			del paf_lines[segment.query_name]
-	samfile.close()
-
-	with open(f'{dictionary}/{prefix}.depth', 'w') as f:
-		for target, depth_list in depths.items():
-			for i, depth in enumerate(depth_list):
-				f.write(f'{target}\t{i}\t{depth}\n')
-
-	return depths, targets_length
-
-
-def filter_bam(bam_file='', prefix='GCI', map_qual=30, clip_percent=0.1, flank_len=10, dictionary='.', force=False):
-	"""
-	usage: filter the bam file based on many metrics, and finally generate the depth file
-
-	input: bam file,
-		   the prefix of output depth file,
-		   the filtered mapping quality,
-		   the filtered clipped percentage (S / (M + I + S)),
-		   the length of flanking bases ([start + num, end - num + 1]),
-		   the path to output,
-		   whether to rewrite the existing files (force)
-
-	output: the whole-genome depth file
+	(output: the whole-genome depth file)
 
 	return: the whole-genome depth dictionary,
 			one dictionary keyed by the targets with the length value
 	"""
-
-	if os.path.exists(f'{dictionary}/{prefix}.depth') and force == False:
-		print(f'ERROR!!! The file "{dictionary}/{prefix}.depth" exists\nPlease using "-f" or "--force" to rewrite', file=sys.stderr)
-		raise SystemExit
+	if generate == True:
+		if os.path.exists(f'{directory}/{prefix}.depth') and force == False:
+			print(f'ERROR!!! The file "{directory}/{prefix}.depth" exists\nPlease using "-f" or "--force" to rewrite', file=sys.stderr)
+			raise SystemExit
 	
 
-	samfile = pysam.AlignmentFile(bam_file, 'rb')
+	samfile = pysam.AlignmentFile(bam_files[0], 'rb')
 	depths = {reference:np.zeros(length, dtype=int) for (reference, length) in zip(samfile.references, samfile.lengths)}
 	targets_length = {reference:length for (reference, length) in zip(samfile.references, samfile.lengths)}
-	
-	for segment in samfile.fetch():
-		if (segment.is_mapped == True) and (segment.is_secondary == False) and (segment.is_supplementary == False) and (segment.mapping_quality >= map_qual):
-			S = segment.get_cigar_stats()[0][4]
-			if (S/segment.query_length <= clip_percent):
-				start = segment.reference_start + flank_len
-				end = segment.reference_end - flank_len
-				depths[segment.reference_name][start:end+1] += 1
 	samfile.close()
+
+	samfile_dicts = [{} for i in range(len(bam_files))]
+	for i, file in enumerate(bam_files):
+		samfile = pysam.AlignmentFile(file, 'rb')
+		for segment in samfile.fetch():
+			if (segment.is_mapped == True) and (segment.is_secondary == False) and (segment.is_supplementary == False) and (segment.mapping_quality >= map_qual):
+				M = segment.get_cigar_stats()[0][0]
+				I = segment.get_cigar_stats()[0][1]
+				D = segment.get_cigar_stats()[0][2]
+				S = segment.get_cigar_stats()[0][4]
+				NM = segment.get_tag('NM')
+				mm = NM - (I + D)
+				if (S/(M+I+S) <= clip_percent) and ((M-mm)/(M+I+D) >= iden_percent):
+					samfile_dicts[i][segment.query_name] = (segment.reference_name, segment.reference_start, segment.reference_end, segment.query_length)
+		samfile.close()
+
+	if len(samfile_dicts) == 1:
+		for segment in samfile_dicts[0].values():
+			target = segment[0]
+			start = segment[1] + flank_len
+			end = segment[2] - flank_len
+			depths[target][start:end+1] += 1
+	else:
+		samfile1 = samfile_dicts[0]
+		for samfile in samfile_dicts[1:]:
+			for query, segment in samfile.items():
+				if query in samfile1.keys():
+					segment1 = samfile1[query]
+					if segment[0] ==  segment1[0]:
+						start1 = segment[1]
+						end1 = segment[2]
+						start2 = segment1[1]
+						end2 = segment1[2]
+
+						ovlp = min(end1, end2) - max(start1, start2)
+						if ovlp/segment[-1] < ovlp_percent:
+							del samfile1[query]
+						else:
+							samfile1[query][1] = max(start1, start2)
+							samfile1[query][2] = min(end1, end2)
+		for segment in samfile1.values():
+			start = segment[1] + flank_len
+			end = segment[2] - flank_len
+			depths[segment[0]][start:end+1] += 1
 	
 
-	with open(f'{dictionary}/{prefix}.depth', 'w') as f:
-		for target, depth_list in depths.items():
-			for i, depth in enumerate(depth_list):
-				f.write(f'{target}\t{i}\t{depth}\n')
-
+	if generate == True:
+		with open(f'{directory}/{prefix}.depth', 'w') as f:
+			for target, depth_list in depths.items():
+				f.write(f'>{target}\n')
+				for i, depth in enumerate(depth_list):
+					f.write(f'{i}\t{depth}\n')
+	
 	return depths, targets_length
 
 
-def merge_two_type_depth(hifi_depths={}, nano_depths={}, prefix='GCI', dictionary='.', force=False):
+def merge_two_type_depth(hifi_depths={}, nano_depths={}, prefix='GCI', directory='.', force=False):
 	"""
 	usage: merge the depths dictionary generated by two types of long reads,
 		   the prefix of output depth file,
@@ -144,8 +107,8 @@ def merge_two_type_depth(hifi_depths={}, nano_depths={}, prefix='GCI', dictionar
 	return: the merged whole-genome depth dictionary
 	"""
 
-	if os.path.exists(f'{dictionary}/{prefix}.depth') and force == False:
-		print(f'ERROR!!! The file "{dictionary}/{prefix}.depth" exists\nPlease using "-f" or "--force" to rewrite', file=sys.stderr)
+	if os.path.exists(f'{directory}/{prefix}.depth') and force == False:
+		print(f'ERROR!!! The file "{directory}/{prefix}.depth" exists\nPlease using "-f" or "--force" to rewrite', file=sys.stderr)
 		raise SystemExit
 
 
@@ -155,15 +118,15 @@ def merge_two_type_depth(hifi_depths={}, nano_depths={}, prefix='GCI', dictionar
 		for i, depth in enumerate(hifi_depth_list):
 			merged_two_type_depths[target].append(max(depth, nano_depth_list[i]))
 	
-	with open(f'{dictionary}/{prefix}.depth', 'w') as f:
+	with open(f'{directory}/{prefix}.depth', 'w') as f:
 		for target, depth_list in merged_two_type_depths.items():
 			for i, depth in enumerate(depth_list):
 				f.write(f'{target}\t{i}\t{depth}\n')
 
 	return merged_two_type_depths
-	
 
-def merge_depth(depths={}, prefix='GCI', threshold=0, flank_len=10, dictionary='.', force=False):
+
+def merge_depth(depths={}, prefix='GCI', threshold=0, flank_len=10, directory='.', force=False):
 	"""
 	usage: merge positions with depth lower than the threshold
 
@@ -179,12 +142,12 @@ def merge_depth(depths={}, prefix='GCI', threshold=0, flank_len=10, dictionary='
 	return: the dictionary containing the merged depth bed file
 	"""
 
-	if os.path.exists(f'{dictionary}/{prefix}.{threshold}.depth.bed') and force == False:
-		print(f'ERROR!!! The file "{dictionary}/{prefix}.{threshold}.depth.bed" exists\nPlease using "-f" or "--force" to rewrite', file=sys.stderr)
+	if os.path.exists(f'{directory}/{prefix}.{threshold}.depth.bed') and force == False:
+		print(f'ERROR!!! The file "{directory}/{prefix}.{threshold}.depth.bed" exists\nPlease using "-f" or "--force" to rewrite', file=sys.stderr)
 		raise SystemExit
 	
 	merged_depths_bed = {target:[] for target in depths.keys()}
-	with open(f'{dictionary}/{prefix}.{threshold}.depth.bed', 'w') as f:
+	with open(f'{directory}/{prefix}.{threshold}.depth.bed', 'w') as f:
 		for target, depth_list in depths.items():
 			start_flag = 0
 			end_flag = 1
@@ -210,9 +173,9 @@ def merge_depth(depths={}, prefix='GCI', threshold=0, flank_len=10, dictionary='
 	return merged_depths_bed
 
 
-def compute_index(targets_length={}, prefix='GCI', dictionary='.', force=False, merged_depths_bed_list=[], type_list=[], flank_len=10):
+def compute_index(targets_length={}, prefix='GCI', directory='.', force=False, merged_depths_bed_list=[], type_list=[], flank_len=10):
 	###########################
-	### version = 0.2
+	### version = 0.3
 	### compute the radio of N50 generated by the candidate gaps
 	### and that of the original genome
 	###########################
@@ -230,10 +193,10 @@ def compute_index(targets_length={}, prefix='GCI', dictionary='.', force=False, 
 	output: an index file containing the reads type, expected N50, observed N50, genome continuity index
 	"""
 
-	if os.path.exists(f'{dictionary}/{prefix}.gci') and force == False:
-		print(f'ERROR!!! The file "{dictionary}/{prefix}.gci" exists\nPlease using "-f" or "--force" to rewrite', file=sys.stderr)
+	if os.path.exists(f'{directory}/{prefix}.gci') and force == False:
+		print(f'ERROR!!! The file "{directory}/{prefix}.gci" exists\nPlease using "-f" or "--force" to rewrite', file=sys.stderr)
 		raise SystemExit
-	with open(f'{dictionary}/{prefix}.gci', 'w') as f:
+	with open(f'{directory}/{prefix}.gci', 'w') as f:
 		f.write('Type of reads\tExpected N50\tObserved N50\tGenome Continuity Index\n')
 	
 
@@ -264,117 +227,96 @@ def compute_index(targets_length={}, prefix='GCI', dictionary='.', force=False, 
 				obs_n50 = obs_lengths[i]
 				break
 		
-		with open(f'{dictionary}/{prefix}.gci', 'a') as f:
+		with open(f'{directory}/{prefix}.gci', 'a') as f:
 			f.write(f'{type_list[j]}\t{exp_n50}\t{obs_n50}\t{100 * math.log2(obs_n50/exp_n50 + 1)}\n')
 
 
-def GCI(hifi=[], nano=[], dictionary='.', prefix='GCI', threads=1, map_qual=30, iden_percent=0.9, ovlp_percent=0.9, clip_percent=0.1, flank_len=10, threshold=0, plot=False, force=False):
-	if dictionary.endswith('/'):
-		dictionary = dictionary.split('/')[0]
-
-	if os.path.exists(dictionary):
-		if not os.access(dictionary, os.R_OK):
-			print(f'ERROR!!! The path "{dictionary}" is unable to read', file=sys.stderr)
+def GCI(hifi=[], nano=[], directory='.', prefix='GCI', threads=1, map_qual=30, iden_percent=0.9, ovlp_percent=0.9, clip_percent=0.1, flank_len=10, threshold=0, plot=False, force=False, generate=False):
+	if directory.endswith('/'):
+		directory = directory.split('/')[0]
+	if os.path.exists(directory):
+		if not os.access(directory, os.R_OK):
+			print(f'ERROR!!! The path "{directory}" is unable to read', file=sys.stderr)
 			raise SystemExit
-		if not os.access(dictionary, os.W_OK):
-			print(f'ERROR!!! The path "{dictionary}" is unable to write', file=sys.stderr)
+		if not os.access(directory, os.W_OK):
+			print(f'ERROR!!! The path "{directory}" is unable to write', file=sys.stderr)
 			raise SystemExit
 	else:
-		os.makedirs(dictionary)
+		os.makedirs(directory)
 
 
 	if prefix.endswith('/'):
 		print(f'ERROR!!! The prefix "{prefix}" is not allowed', file=sys.stderr)
 		raise SystemExit
 	
-	hifi_bam = ''
-	hifi_paf = ''
-	nano_bam = ''
-	nano_paf = ''
-	if hifi != None:
-		for file in hifi:
-			CompletedProcess = subprocess.run(f'file -r {file}', shell=True, check=True, capture_output=True)
-			if 'gzip' in str(CompletedProcess.stdout):
-				hifi_bam = file
-			else:
-				hifi_paf = file
-	if nano != None:
-		for file in nano:
-			CompletedProcess = subprocess.run(f'file -r {file}', shell=True, check=True, capture_output=True)
-			if 'gzip' in str(CompletedProcess.stdout):
-				nano_bam = file
-			else:
-				nano_paf = file
-	
 
 	if nano == None:
-		if hifi_paf == '':
-			depths, targets_length = filter_bam(hifi_bam, prefix, map_qual, clip_percent, flank_len, dictionary, force)
-		else:
-			depths, targets_length = filter_paf_bam(hifi_paf, hifi_bam, prefix, map_qual, iden_percent, clip_percent, ovlp_percent, flank_len, dictionary, force)
-		merged_depth_bed = merge_depth(depths, prefix, threshold, flank_len, dictionary, force)
-		compute_index(targets_length, prefix, dictionary, force, [merged_depth_bed], ['HiFi'], flank_len)
+		depths, targets_length = filter_bam(hifi, prefix, map_qual, iden_percent, clip_percent, ovlp_percent, flank_len, directory, force, generate)
+		merged_depth_bed = merge_depth(depths, prefix, threshold, flank_len, directory, force)
+		compute_index(targets_length, prefix, directory, force, [merged_depth_bed], ['HiFi'], flank_len)
 
 	elif hifi == None:
-		if nano_paf == '':
-			depths, targets_length = filter_bam(nano_bam, prefix, map_qual, clip_percent, flank_len, dictionary, force)
-		else:
-			depths, targets_length = filter_paf_bam(nano_paf, nano_bam, prefix, map_qual, iden_percent, clip_percent, ovlp_percent, flank_len, dictionary, force)
-		merged_depth_bed = merge_depth(depths, prefix, threshold, flank_len, dictionary, force)
-		compute_index(targets_length, prefix, dictionary, force, [merged_depth_bed], ['Nano'], flank_len)
+		depths, targets_length = filter_bam(nano, prefix, map_qual, iden_percent, clip_percent, ovlp_percent, flank_len, directory, force, generate)
+		merged_depth_bed = merge_depth(depths, prefix, threshold, flank_len, directory, force)
+		compute_index(targets_length, prefix, directory, force, [merged_depth_bed], ['Nano'], flank_len)
 	
 	else:
-		hifi_samfile = pysam.AlignmentFile(hifi_bam, 'rb')
-		nano_samfile = pysam.AlignmentFile(nano_bam, 'rb')
-		if set(hifi_samfile.references) != set(nano_samfile.references):
-			print(f'ERROR!!! The targets in hifi and nano alignment files are inconsistent\nPlease check the reference used in mapping hifi and ont reads', file=sys.stderr)
+		hifi_refs = []
+		nano_refs = []
+		for samfile in hifi:
+			hifi_samfile = pysam.AlignmentFile(samfile, 'rb')
+			for ref in hifi_samfile.references:
+				hifi_refs.append(ref)
+			hifi_samfile.close()
+		for samfile in nano:
+			nano_samfile = pysam.AlignmentFile(samfile, 'rb')
+			for ref in nano_samfile.references:
+				nano_refs.append(ref)
+			nano_samfile.close()
+		
+		if set(hifi_refs) != set(nano_refs):
+			print(f'ERROR!!! The targets in hifi and nano alignment files are inconsistent\nPlease check the reference used in mapping both hifi and ont reads', file=sys.stderr)
 			raise SystemExit
-		hifi_samfile.close()
-		nano_samfile.close()
+		
 
-		if hifi_paf == '':
-			hifi_depths, targets_length = filter_bam(hifi_bam, prefix+'_hifi', map_qual, clip_percent, flank_len, dictionary, force)
-		else:
-			hifi_depths, targets_length = filter_paf_bam(hifi_paf, hifi_bam, prefix+'_hifi', map_qual, iden_percent, clip_percent, ovlp_percent, flank_len, dictionary, force)
-		if nano_paf == '':
-			nano_depths, targets_length = filter_bam(nano_bam, prefix+'_nano', map_qual, clip_percent, flank_len, dictionary, force)
-		else:
-			nano_depths, targets_length = filter_paf_bam(nano_paf, nano_bam, prefix+'_nano', map_qual, iden_percent, clip_percent, ovlp_percent, flank_len, dictionary, force)
+		hifi_depths, targets_length = filter_bam(hifi, prefix, map_qual, iden_percent, clip_percent, ovlp_percent, flank_len, directory, force, generate)
+		nano_depths, targets_length = filter_bam(nano, prefix, map_qual, iden_percent, clip_percent, ovlp_percent, flank_len, directory, force, generate)
+		#merged_two_type_depths = merge_two_type_depth(hifi_depths, nano_depths, prefix+'_two_type', directory, force)
 
-		merged_two_type_depths = merge_two_type_depth(hifi_depths, nano_depths, prefix+'_two_type', dictionary, force)
-		hifi_merged_depth_bed = merge_depth(hifi_depths, prefix+'_hifi', threshold, flank_len, dictionary, force)
-		nano_merged_depth_bed = merge_depth(nano_depths, prefix+'_nano', threshold, flank_len, dictionary, force)
-		two_type_merged_depth_bed = merge_depth(merged_two_type_depths, prefix+'_two_type', threshold, flank_len, dictionary, force)
-		compute_index(targets_length, prefix, dictionary, force, [hifi_merged_depth_bed, nano_merged_depth_bed, two_type_merged_depth_bed], ['HiFi', 'Nano', 'HiFi + Nano'], flank_len)
+		hifi_merged_depth_bed = merge_depth(hifi_depths, prefix+'_hifi', threshold, flank_len, directory, force)
+		nano_merged_depth_bed = merge_depth(nano_depths, prefix+'_nano', threshold, flank_len, directory, force)
+		compute_index(targets_length, prefix, directory, force, [hifi_merged_depth_bed, nano_merged_depth_bed], ['HiFi', 'Nano'], flank_len)
+		#two_type_merged_depth_bed = merge_depth(merged_two_type_depths, prefix+'_two_type', threshold, flank_len, directory, force)
+		#compute_index(targets_length, prefix, directory, force, [hifi_merged_depth_bed, nano_merged_depth_bed, two_type_merged_depth_bed], ['HiFi', 'Nano', 'HiFi + Nano'], flank_len)
 
 
 if __name__=='__main__':
-	######################
-	### version = 0.2
-	### ideally at least one bam file for one type of reads (HiFi and/or ONT) alignment
-	### but this initial version can only analyze the case of inputting one paf and one bam
-	### and can only parse one type of reads alignment 
-	######################
-	version = '0.2'
+	###########################
+	### version = 0.3
+	### this version have some limits: -t, -p
+	### and can only output the results generated by one type of reads respectively
+	###########################
+	version = '0.3'
 
 	parser = argparse.ArgumentParser(prog=sys.argv[0], add_help=False, formatter_class=argparse.RawDescriptionHelpFormatter, description='A program for assessing the T2T genome', epilog='Examples:\npython GCI.py --hifi hifi.bam hifi.paf --nano ont.bam ont.paf')
 
 	group_io = parser.add_argument_group("Input/Output")
-	group_io.add_argument('--hifi', nargs='+', metavar='', help='PacBio HiFi reads alignment files (one bam / one bam and one paf)')
-	group_io.add_argument('--nano', nargs='+', metavar='', help='Oxford Nanopore long reads alignment files (one bam / one bam and one paf)')
-	group_io.add_argument('-d', nargs='?', dest='dictionary', metavar='PATH', help='The dictionary of output files [.]', const='.', default='.')
+	group_io.add_argument('--hifi', nargs='+', metavar='', help='PacBio HiFi reads alignment files (at least one bam file)')
+	group_io.add_argument('--nano', nargs='+', metavar='', help='Oxford Nanopore long reads alignment files (at least one bam file)')
+	group_io.add_argument('-d', nargs='?', dest='directory', metavar='PATH', help='The directory of output files [.]', const='.', default='.')
 	group_io.add_argument('-o', '--output', nargs='?', dest='prefix', metavar='STR', help='Prefix of output files [GCI]', const='GCI', default='GCI')
 	group_io.add_argument('-t', '--threads', nargs='?', metavar='INT', type=int, help='Number of threads [1]', const=1, default=1)
 
 	group_fo = parser.add_argument_group("Filter Options")
-	group_fo.add_argument('-mq', '--map-qual', nargs='?', metavar='INT', type=int, help='Minium mapping quality for alignments in both bam and paf files [30]', const=30, default=30)
-	group_fo.add_argument('-ip', '--iden-percent', nargs='?', metavar='FLOAT', type=float, help='Minimum identity (num_match_res/len_aln) of the reads in paf file [0.9]', const=0.9, default=0.9)
-	group_fo.add_argument('-op', '--ovlp-percent', nargs='?', metavar='FLOAT', type=float, help='Minimum overlapping percentage of the reads if inputting two alignment files [0.9]', const=0.9, default=0.9)
-	group_fo.add_argument('-cp', '--clip-percent', nargs='?', metavar='FLOAT', type=float, help='Maximum clipped percentage of the reads in bam files [0.1]', const=0.1, default=0.1)
+	group_fo.add_argument('-mq', '--map-qual', nargs='?', metavar='INT', type=int, help='Minium mapping quality for alignments [30]', const=30, default=30)
+	group_fo.add_argument('-ip', '--iden-percent', nargs='?', metavar='FLOAT', type=float, help='Minimum identity (num_match_res/len_aln) of the reads [0.9]', const=0.9, default=0.9)
+	group_fo.add_argument('-op', '--ovlp-percent', nargs='?', metavar='FLOAT', type=float, help='Minimum overlapping percentage of the reads if inputting more than one alignment files [0.9]', const=0.9, default=0.9)
+	group_fo.add_argument('-cp', '--clip-percent', nargs='?', metavar='FLOAT', type=float, help='Maximum clipped percentage of the reads [0.1]', const=0.1, default=0.1)
 	group_fo.add_argument('-fl', '--flank-len', nargs='?', metavar='INT', type=int, help='The flanking length of the clipped bases [10]', const=10, default=10)
 	group_fo.add_argument('-ts', '--threshold', nargs='?', metavar='INT', type=int, help='The threshold of depth in the final bed file [0]', const=0, default=0)
 
 	group_op = parser.add_argument_group("Other Options")
+	group_op.add_argument('-g', '--generate', action='store_const', help='Generate the depth files', const=True, default=False)
 	group_op.add_argument('-f', '--force', action='store_const', help='Force rewriting of existing files', const=True, default=False)
 	group_op.add_argument('-p', '--plot', action='store_const', help='Visualize the final result', const=True, default=False)
 	group_op.add_argument('-h', '--help', action="help", help="Show this help message and exit")
@@ -401,9 +343,6 @@ if __name__=='__main__':
 		if bam_num == 0:
 			print('ERROR!!! Please input at least one PacBio HiFi reads bam file\nPlease read the help message using "-h" or "--help"', file=sys.stderr)
 			raise SystemExit
-		elif bam_num == 2:
-			print('ERROR!!! Please input one PacBio HiFi reads bam file and one paf file\nPlease read the help message using "-h" or "--help"', file=sys.stderr)
-			raise SystemExit
 		
 	if args['nano'] != None:
 		bam_num = 0
@@ -416,10 +355,7 @@ if __name__=='__main__':
 				print(f'ERROR!!! "{file}" is not an available file', file=sys.stderr)
 				raise SystemExit
 		if bam_num == 0:
-			print('ERROR!!! Please input at least one PacBio HiFi reads bam file\nPlease read the help message using "-h" or "--help"', file=sys.stderr)
-			raise SystemExit
-		elif bam_num == 2:
-			print('ERROR!!! Please input one PacBio HiFi reads bam file and one paf file\nPlease read the help message using "-h" or "--help"', file=sys.stderr)
+			print('ERROR!!! Please input at least one Oxford Nanopore long reads bam file\nPlease read the help message using "-h" or "--help"', file=sys.stderr)
 			raise SystemExit
 	
 	GCI(**args)
