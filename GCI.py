@@ -146,17 +146,11 @@ def filter(paf_files=[], bam_files=[], prefix='GCI', map_qual=30, iden_percent=0
 		samfile.close()
 
 	files = paf_lines + samfile_dicts
-	if len(files) == 1:
-		for segment in files[0].values():
-			target = segment[0]
-			start = segment[1] + flank_len
-			end = segment[2] - flank_len
-			depths[target][start:end+1] += 1
-	else:
-		querys = []
+	if len(files) > 1:
+		files_sets = []
 		for file in files:
-			querys += list(file.keys())
-		querys = set(querys)
+			files_sets.append(set(file.keys()))
+		querys = set.intersection(*files_sets)
 
 		file1 = {query:segment for query, segment in files[0].items() if query in querys}
 		for file in files[1:]:
@@ -174,11 +168,13 @@ def filter(paf_files=[], bam_files=[], prefix='GCI', map_qual=30, iden_percent=0
 							del file1[query]
 						else:
 							file1[query] = (segment1[0], max(start1, start2), min(end1, end2))
-		for segment in file1.values():
-			target = segment[0]
-			start = segment[1] + flank_len
-			end = segment[2] - flank_len
-			depths[target][start:end+1] += 1
+	else:
+		file1 = files[0]
+	for segment in file1.values():
+		target = segment[0]
+		start = segment[1] + flank_len
+		end = segment[2] - flank_len
+		depths[target][start:end+1] += 1
 
 
 	if generate == True:
@@ -434,8 +430,8 @@ def GCI(hifi=[], nano=[], directory='.', prefix='GCI', threads=1, map_qual=30, i
 			raise SystemExit
 		
 
-		hifi_depths, targets_length = filter(hifi_paf, hifi_bam, prefix, map_qual, iden_percent, clip_percent, ovlp_percent, flank_len, directory, force, generate)
-		nano_depths, targets_length = filter(nano_paf, nano_bam, prefix, map_qual, iden_percent, clip_percent, ovlp_percent, flank_len, directory, force, generate)
+		hifi_depths, targets_length = filter(hifi_paf, hifi_bam, prefix+'_hifi', map_qual, iden_percent, clip_percent, ovlp_percent, flank_len, directory, force, generate)
+		nano_depths, targets_length = filter(nano_paf, nano_bam, prefix+'_nano', map_qual, iden_percent, clip_percent, ovlp_percent, flank_len, directory, force, generate)
 		merged_two_type_depths = merge_two_type_depth(hifi_depths, nano_depths, prefix+'_two_type', directory, force, generate)
 
 		hifi_merged_depth_bed = merge_depth(hifi_depths, prefix+'_hifi', threshold, flank_len, directory, force)
@@ -449,13 +445,14 @@ if __name__=='__main__':
 	### version = 1.0
 	### this version have some limits: -t, -p
 	###########################
-	version = '1.0'
+	version = 'GCI version 1.0'
 
 	parser = argparse.ArgumentParser(prog=sys.argv[0], add_help=False, formatter_class=argparse.RawDescriptionHelpFormatter, description='A program for assessing the T2T genome', epilog='Examples:\npython GCI.py --hifi hifi.bam hifi.paf ... --nano nano.bam nano.paf ...')
 
 	group_io = parser.add_argument_group("Input/Output")
 	group_io.add_argument('--hifi', nargs='+', metavar='', help='PacBio HiFi reads alignment files (at least one bam file)')
 	group_io.add_argument('--nano', nargs='+', metavar='', help='Oxford Nanopore long reads alignment files (at least one bam file)')
+	group_io.add_argument('-ts', '--threshold', nargs='?', metavar='INT', type=int, help='The threshold of depth in the final bed file [0]', const=0, default=0)
 	group_io.add_argument('-dp', '--dist-percent', nargs='?', metavar='FLOAT', type=float, help='The percentage of the distance between the candidate gap intervals in the whole chromosome (contig) [0.001]', const=0.001, default=0.001)
 	group_io.add_argument('-d', nargs='?', dest='directory', metavar='PATH', help='The directory of output files [.]', const='.', default='.')
 	group_io.add_argument('-o', '--output', nargs='?', dest='prefix', metavar='STR', help='Prefix of output files [GCI]', const='GCI', default='GCI')
@@ -467,7 +464,6 @@ if __name__=='__main__':
 	group_fo.add_argument('-op', '--ovlp-percent', nargs='?', metavar='FLOAT', type=float, help='Minimum overlapping percentage of the reads if inputting more than one alignment files [0.9]', const=0.9, default=0.9)
 	group_fo.add_argument('-cp', '--clip-percent', nargs='?', metavar='FLOAT', type=float, help='Maximum clipped percentage of the reads [0.1]', const=0.1, default=0.1)
 	group_fo.add_argument('-fl', '--flank-len', nargs='?', metavar='INT', type=int, help='The flanking length of the clipped bases [10]', const=10, default=10)
-	group_fo.add_argument('-ts', '--threshold', nargs='?', metavar='INT', type=int, help='The threshold of depth in the final bed file [0]', const=0, default=0)
 
 	group_op = parser.add_argument_group("Other Options")
 	group_op.add_argument('-g', '--generate', action='store_const', help='Generate the depth files', const=True, default=False)
