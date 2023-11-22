@@ -11,8 +11,9 @@ Genome Continuity Index (GCI) is a program for assessing the T2T genome, which h
 ## Contents
 - [Requirements](https://github.com/yeeus/GCI#requirements)
 - [Parameters](https://github.com/yeeus/GCI#parameters)
-- [Usage](https://github.com/yeeus/GCI#usage)
+- [Usage](https://github.com/yeeus/GCI#usage) 
 - [Outputs](https://github.com/yeeus/GCI#outputs)
+- [Utility](https://github.com/yeeus/GCI#utility)
 - [Citation](https://github.com/yeeus/GCI#citation)
 - [Help](https://github.com/yeeus/GCI#help)
 - [To do](https://github.com/yeeus/GCI#to-do)
@@ -24,48 +25,48 @@ For the complete pipeline, there are several necessary softwares:
 - [seqkit](https://github.com/shenwei356/seqkit) (for seq processing)
 - [minimap2](https://github.com/lh3/minimap2) (for mapping)
 - [winnowmap](https://github.com/marbl/Winnowmap) (for mapping)
+- [samtools](https://github.com/samtools/samtools) (for sam/bam processing)
 - [paftools.js](https://github.com/lh3/minimap2/blob/master/misc/paftools.js) (for converting sam to paf)
 
 As for **GCI**, it requires:
 - **python3.x** (written in python3.11.0 and tested in python3.10.8)
 - pysam (stable version)
 - numpy (stable version)
-- karyotypeR (for plotting) ###
+- [bamsnap](https://github.com/zy041225/bamsnap) (for plotting) ###
 
 
 ### Parameters
 ```
 python GCI.py --help
 
-usage: GCI.py [--hifi  [...]] [--nano  [...]] [-dp [FLOAT]] [-d [PATH]] [-o [STR]] [-t [INT]] [-mq [INT]] [-ip [FLOAT]] [-op [FLOAT]]
-              [-cp [FLOAT]] [-fl [INT]] [-ts [INT]] [-g] [-f] [-p] [-h] [-v]
+usage: GCI.py [--hifi  [...]] [--nano  [...]] [-ts INT] [-dp FLOAT] [-d PATH] [-o STR] [-t INT] [-mq INT] [-ip FLOAT] [-op FLOAT]
+                 [-cp FLOAT] [-fl INT] [-g] [-f] [-p] [-h] [-v]
 
 A program for assessing the T2T genome
 
 Input/Output:
   --hifi  [ ...]        PacBio HiFi reads alignment files (at least one bam file)
   --nano  [ ...]        Oxford Nanopore long reads alignment files (at least one bam file)
-  -dp [FLOAT], --dist-percent [FLOAT]
+  -ts INT, --threshold INT
+                        The threshold of depth in the final bed file [0]
+  -dp FLOAT, --dist-percent FLOAT
                         The percentage of the distance between the candidate gap intervals in the whole chromosome (contig) [0.001]
-  -d [PATH]             The directory of output files [.]
-  -o [STR], --output [STR]
-                        Prefix of output files [GCI]
-  -t [INT], --threads [INT]
+  -d PATH               The directory of output files [.]
+  -o STR, --output STR  Prefix of output files [GCI]
+  -t INT, --threads INT
                         Number of threads [1]
 
 Filter Options:
-  -mq [INT], --map-qual [INT]
+  -mq INT, --map-qual INT
                         Minium mapping quality for alignments [30]
-  -ip [FLOAT], --iden-percent [FLOAT]
+  -ip FLOAT, --iden-percent FLOAT
                         Minimum identity (num_match_res/len_aln) of the reads [0.9]
-  -op [FLOAT], --ovlp-percent [FLOAT]
+  -op FLOAT, --ovlp-percent FLOAT
                         Minimum overlapping percentage of the reads if inputting more than one alignment files [0.9]
-  -cp [FLOAT], --clip-percent [FLOAT]
+  -cp FLOAT, --clip-percent FLOAT
                         Maximum clipped percentage of the reads [0.1]
-  -fl [INT], --flank-len [INT]
+  -fl INT, --flank-len INT
                         The flanking length of the clipped bases [10]
-  -ts [INT], --threshold [INT]
-                        The threshold of depth in the final bed file [0]
 
 Other Options:
   -g, --generate        Generate the depth files
@@ -105,7 +106,9 @@ minimap2 -t $threads -ax map-hifi $mat_asm $mat_hifi > ${mat.minimap2.hifi.sam} 
 
 samtools view -@ $threads -Sb ${mat.minimap2.hifi.sam} | samtools sort -@ $threads -o ${mat.minimap2.hifi.bam}
 samtools index ${mat.minimap2.hifi.bam} ## this is necessary!!!
-paftools.js sam2paf ${mat.minimap2.hifi.sam} | sort -k6,6V -k8,8n > ${mat.minimap2.hifi.paf} ## please sort the paf file because our program don't automatically sort the file by the targets names!
+paftools.js sam2paf (-p) ${mat.minimap2.hifi.sam} | sort -k6,6V -k8,8n > ${mat.minimap2.hifi.paf} ## We recommend to use "-p" to filter the supplementary alignments
+                                                                                                  ## please sort the paf file
+                                                                                                  ## because our program don't automatically sort the file by the targets names!
 
 # winnowmap
 meryl count k=15 output $mat_merylDB $mat_asm
@@ -114,7 +117,9 @@ winnowmap -W $mat_repetitive_k15.txt -ax map-pb $mat_asm $mat_hifi > ${mat.winno
 
 samtools view -@ $threads -Sb ${mat.winnowmap.hifi.sam} | samtools sort -@ $threads -o ${mat.winnowmap.hifi.bam}
 samtools index ${mat.minimap2.hifi.bam} ## this is necessary!!!
-paftools.js sam2paf ${mat.winnowmap.hifi.sam} | sort -k6,6V -k8,8n > ${mat.winnowmap.hifi.paf} ## please sort the paf file because our program don't automatically sort the file by the targets names!
+paftools.js sam2paf (-p) ${mat.winnowmap.hifi.sam} | sort -k6,6V -k8,8n > ${mat.winnowmap.hifi.paf} ## We recommend to use "-p" to filter the supplementary alignments
+                                                                                                    ## please sort the paf file
+                                                                                                    ## because our program don't automatically sort the file by the targets names!
 ```
 
 3. Filter the mapping files and get the genome continuity index
@@ -143,6 +148,73 @@ python GCI.py --hifi hifi.bam hifi.paf (--nano ont.bam ont.paf) -d mat -o mat -t
   - ${prefix}_two_type.${threshold}.depth.bed ## the merged depth file in bed format generated by the two types of reads alignment file
   - ${prefix}.gci
 
+### Utility
+- filter_bam.py
+  - Parameters
+    ```
+    usage: filter_bam.py [-d PATH] [-o [STR ...]] [-t INT] [-mq INT] [-ip FLOAT] [-op FLOAT] [-cp FLOAT] [-p] [-r STR] [-R FILE] [-f] [-h]
+                     ALIGNMENT-FILE [ALIGNMENT-FILE ...]
+
+    This is the core part of the main program GCI.py with additional functions
+    You can provide some bam and paf files (like GCI.py) and set the filtered parameters
+    and then you will get the filtered bam file which can be used for subsequent analysis
+    
+    Input/Output:
+      ALIGNMENT-FILE        Long reads alignment files (at least one bam file)
+      -d PATH               The directory of output files [.]
+      -o [STR ...], --output [STR ...]
+                            Prefix of output files; one prefix corresponds to one bam file in order and if provide the parameter "-p", the last
+                            one was used as the prefix for bamsnap outputs [[$input.filter] for filtered bam files and [GCI] for bamsnap
+                            outputs]
+      -t INT, --threads INT
+                            Number of threads [1]
+    
+    Filter Options:
+      -mq INT, --map-qual INT
+                            Minium mapping quality for alignments [30]
+      -ip FLOAT, --iden-percent FLOAT
+                            Minimum identity (num_match_res/len_aln) of the reads [0.9]
+      -op FLOAT, --ovlp-percent FLOAT
+                            Minimum overlapping percentage of the reads if inputting more than one alignment files [0.9]
+      -cp FLOAT, --clip-percent FLOAT
+                            Maximum clipped percentage of the reads [0.1]
+    
+    Plot Options:
+      -p, --plot            Visualize the filtered bam files
+      -r STR, --region STR  The region to plot in chr:pos or chr:start-end format
+      -R FILE, --regions-file FILE
+                            Bed file contains the regions to plot
+    
+    Other Options:
+      -f, --force           Force rewriting of existing files
+      -h, --help            Show this help message and exit
+    
+    Examples:
+    python filter_bam.py bam1 paf1 ...
+    ```
+  - Usage
+
+    This script is used to get the filtered bam files (and get the final plots).
+    - Example1
+
+      After getting the ${prefix}.${threshold}.depth.bed file, we'd like to get the detailed filtering information. So, we can just extract the alignments in the bed file:
+      ```
+      samtools view -@ $threads -Sb -L ${prefix}.${threshold}.depth.bed ${hifi.bam} > test.bam
+      samtools index test.bam
+      ```
+      Then we can input the bam file with other paf file(s):
+      ```
+      python filter_bam.py test.bam test.paf -d test -o test ## if no prefix provided, the output file would be `test.filter.bam`
+      ```
+      Finally we get the filtered bam file `test.bam`.
+
+      After `samtools sort && index`, we can visualize the sorted file in [IGV](https://github.com/igvteam/igv):
+      > ![IGV_test](https://github.com/yeeus/GCI/images/igv_test.svg)
+
+    - Example2
+
+      We can immediately visualize the alignments after getting the filtered file.
+      
 ### Citation
 
 
@@ -156,7 +228,3 @@ For another helps, please contact quanyu_chen@outlook.com.
 - contribution for N50 per chromosome
 - multiple threads
 - simulated
-- benchmark
-  - clip_percent: 0.05, 0.1, 0.2
-  - flank_len: 10, 20, 50
-  - performance: distribution, index
