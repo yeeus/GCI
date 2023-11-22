@@ -208,13 +208,13 @@ python GCI.py --hifi hifi.bam hifi.paf (--nano ont.bam ont.paf) -d mat -o mat -t
       ```
       Finally we get the filtered bam file `test.bam`.
 
-      After `samtools sort && index`, we can visualize the sorted file in [IGV](https://github.com/igvteam/igv):
+      After `samtools sort && index`, we can visualize the raw and filtered bam file in [IGV](https://github.com/igvteam/igv):
       > ![https://github.com/yeeus/GCI/images/igv_test.png](https://github.com/yeeus/GCI/blob/main/images/igv_test.png)
       > The top track is the raw bam file and the bottom is the filtered.
 
     - Example2
 
-      We can immediately visualize the alignments after getting the filtered file.
+      We can immediately visualize the alignments after getting the filtered file without using IGV.
       
 ### Citation
 
