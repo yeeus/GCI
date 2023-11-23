@@ -78,20 +78,20 @@ def filter(paf_files=[], bam_files=[], prefix='GCI', map_qual=30, iden_percent=0
 	"""
 	
 	output_files = []
-	#output_files_name = []
+	output_files_name = []
 	samfile = pysam.AlignmentFile(bam_files[0], 'rb')
 	for i, file in enumerate(bam_files):
 		if isinstance(prefix, str):
 			if os.path.exists(f'{directory}/{".".join(file.split(".")[:-1])}.filter.bam') and force == False:
 				print(f'ERROR!!! The file "{directory}/{".".join(file.split(".")[:-1])}.filter.bam" exists\nPlease using "-f" or "--force" to rewrite', file=sys.stderr)
 				raise SystemExit
-			#output_files_name.append(f'{directory}/{".".join(file.split(".")[:-1])}.filter.bam')
+			output_files_name.append(f'{directory}/{".".join(file.split(".")[:-1])}.filter.bam')
 			f = pysam.AlignmentFile(f'{directory}/{".".join(file.split(".")[:-1])}.filter.bam', 'wb', template=samfile)
 		else:
 			if os.path.exists(f'{directory}/{prefix[i]}.bam') and force == False:
 				print(f'ERROR!!! The file "{directory}/{prefix[i]}.bam" exists\nPlease using "-f" or "--force" to rewrite', file=sys.stderr)
 				raise SystemExit
-			#output_files_name.append(f'{directory}/{prefix[i]}.bam')
+			output_files_name.append(f'{directory}/{prefix[i]}.bam')
 			f = pysam.AlignmentFile(f'{directory}/{prefix[i]}.bam', 'wb', template=samfile)
 		output_files.append(f)
 	samfile.close()
@@ -188,13 +188,12 @@ def filter(paf_files=[], bam_files=[], prefix='GCI', map_qual=30, iden_percent=0
 					output_files[i].write(segment1)
 					break
 		samfile.close()
+		output_files[i].close()
 
-	"""for file in output_files_name:
+	for file in output_files_name:
 		random_string = ''.join(random.choices(string.ascii_letters + string.digits, k=10))
-		r1 = subprocess.run(f'samtools sort {file} -o {directory}/{random_string}.bam', shell=True, capture_output=True, check=True)
-		print(r1.stdout)
-		print(r1.stderr)
-		subprocess.run(f'mv {directory}/{random_string}.bam {file}', shell=True, capture_output=True)"""
+		subprocess.run(f'samtools sort {file} -o {directory}/{random_string}.bam', shell=True, capture_output=True, check=True)
+		subprocess.run(f'mv {directory}/{random_string}.bam {file}', shell=True, capture_output=True)
 
 
 def preprocessing(files=[], directory='.', prefix='GCI', threads=1, map_qual=30, iden_percent=0.9, ovlp_percent=0.9, clip_percent=0.1, plot=False, region='', regions_file='', force=False):
