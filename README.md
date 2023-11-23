@@ -206,9 +206,7 @@ python GCI.py --hifi hifi.bam hifi.paf (--nano ont.bam ont.paf) -d mat -o mat -t
       ```
       python filter_bam.py test.bam test.paf -d test -o test ## if no prefix provided, the output file would be `test.filter.bam`
       ```
-      Finally we get the filtered bam file `test.bam`.
-
-      After `samtools sort && index`, we can visualize the raw and filtered bam file in [IGV](https://github.com/igvteam/igv):
+      Finally we get the filtered bam file `test.bam`. Next, we can visualize the raw and filtered bam files in [IGV](https://github.com/igvteam/igv):
       > ![https://github.com/yeeus/GCI/images/igv_test.png](https://github.com/yeeus/GCI/blob/main/images/igv_test.png)
       > The top track is the raw bam file and the bottom is the filtered.
 
