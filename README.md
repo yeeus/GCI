@@ -13,6 +13,7 @@ Genome Continuity Index (GCI) is a program for assessing the T2T genome, which h
 - [Parameters](https://github.com/yeeus/GCI#parameters)
 - [Usage](https://github.com/yeeus/GCI#usage) 
 - [Outputs](https://github.com/yeeus/GCI#outputs)
+- [Benchmark](https://github.com/yeeus/GCI#benchmark)
 - [Utility](https://github.com/yeeus/GCI#utility)
 - [Citation](https://github.com/yeeus/GCI#citation)
 - [Help](https://github.com/yeeus/GCI#help)
@@ -161,6 +162,13 @@ python GCI.py --hifi hifi.bam hifi.paf (--nano ont.bam ont.paf) -d mat -o mat -t
   - (images/)
     - ${prefix}.${target}.${image_type}
 
+### Benchmark
+We benchmarked GCI in many genomes:
+| Type of reads     | CHM13 | CN1 | 
+| ------------------| ----- | --- |
+| HiFi (depth; GCI) | xxxxx | xxx |
+| Nano (depth; GCI) | xxxxx | xxx |
+| HiFi + Nano       | xxxxx | xxx |
 ### Utility
 - filter_bam.py
   - Usage
