@@ -424,7 +424,7 @@ def sliding_window_average_depth(depths=[], window_size=1, max_depth=None):
 	return averaged_positions, averaged_depths
 
 
-def plot_depth(depths_list=[], depth_min=0.1, depth_max=10.0, window_size=0.001, image_type='pdf', directory='.', prefix='GCI', force=False):
+def plot_depth(depths_list=[], depth_min=0.1, depth_max=10.0, window_size=0.001, image_type='png', directory='.', prefix='GCI', force=False):
 	"""
 	usage: plot whole genome depth
 
@@ -448,17 +448,30 @@ def plot_depth(depths_list=[], depth_min=0.1, depth_max=10.0, window_size=0.001,
 		print(f'ERROR!!! The format of output images only supports pdf and png', file=sys.stderr)
 		raise SystemExit
 	
-	
+	if len(depths_list) == 1:
+		sum_depths = []
+		for depths in depths_list[0].values():
+			sum_depths = np.concatenate((sum_depths, depths))
+		mean_depth = np.mean(sum_depths)
+	elif len(depths_list)  == 2:
+		sum_depths = []
+		for depths in depths_list[0].values():
+			sum_depths = np.concatenate((sum_depths, depths))
+		mean_depth1 = np.mean(sum_depths)
+		sum_depths = []
+		for depths in depths_list[-1].values():
+			sum_depths = np.concatenate((sum_depths, depths))
+		mean_depth2 = np.mean(sum_depths)
+
 	for target in depths_list[0].keys():
 		if len(depths_list) == 1:
-			fig, ax = plt.subplots(figsize=(20, 5))
+			fig, ax = plt.subplots(figsize=(20, 2.5))
 
 			depths = depths_list[0][target]
-			mean_depth = np.mean(depths)
 			max_depth = mean_depth * depth_max
 			averaged_positions, averaged_depths = sliding_window_average_depth(depths, max(1, round(len(depths) * window_size)), max_depth)
 
-			ax.plot(averaged_positions, averaged_depths, lw=0.8, color='#2ca25f', zorder=4)
+			ax.stackplot(averaged_positions, averaged_depths, lw=0.8, color='#2ca25f', zorder=4)
 			ax.axhline(mean_depth, color="r", ls='--', dash_capstyle='butt', lw=1, zorder=5)
 			
 			merged_min_bed = collapse_depth_range({target:depths}, 0, mean_depth * depth_min, 0)
@@ -469,22 +482,20 @@ def plot_depth(depths_list=[], depth_min=0.1, depth_max=10.0, window_size=0.001,
 				ax.axvspan(segment[0], segment[1], facecolor='#FAD7DD')
 		
 		elif len(depths_list)  == 2:
-			fig, ax = plt.subplots(figsize=(20, 10))
+			fig, ax = plt.subplots(figsize=(20, 5))
 
 			depths1 = depths_list[0][target]
-			mean_depth1 = np.mean(depths1)
 			depth_max1 = mean_depth1 * depth_max
 			averaged_positions1, averaged_depths1 = sliding_window_average_depth(depths1, max(1, round(len(depths1) * window_size)), depth_max1)
 
-			ax.plot(averaged_positions1, averaged_depths1, lw=0.8, color='#2ca25f', zorder=4)
+			ax.stackplot(averaged_positions1, averaged_depths1, lw=0.8, color='#2ca25f', zorder=4)
 			ax.axhline(mean_depth1, color="r", ls='-.', dash_capstyle='butt', lw=1, zorder=5)
 			
 			ax.axhline(0, color="black")
 			depths2 = depths_list[-1][target]
-			mean_depth2 = np.mean(depths2)
 			depth_max2 = mean_depth2 * depth_max
 			averaged_positions2, averaged_depths2 = sliding_window_average_depth(depths2, max(1, round(len(depths2) * window_size)), depth_max2)
-			ax.plot(averaged_positions2, -np.array(averaged_depths2), lw=0.8, color='#3C5488', zorder=4)
+			ax.stackplot(averaged_positions2, -np.array(averaged_depths2), lw=0.8, color='#3C5488', zorder=4)
 			ax.axhline(-mean_depth2, color="r", ls='-.', dash_capstyle='butt', lw=1, zorder=5)
 			
 
@@ -522,11 +533,11 @@ def plot_depth(depths_list=[], depth_min=0.1, depth_max=10.0, window_size=0.001,
 		plt.xticks(fontsize=12)
 		plt.yticks(fontsize=12)
 		plt.tight_layout()
-		plt.savefig(f'{directory}/images/{prefix}.{target}.{image_type}', dpi=300)
+		plt.savefig(f'{directory}/images/{prefix}.{target}.{image_type}', dpi=200)
 		plt.close()
 
 
-def GCI(hifi=[], nano=[], directory='.', prefix='GCI', threads=1, map_qual=30, iden_percent=0.9, ovlp_percent=0.9, clip_percent=0.1, flank_len=10, threshold=0, plot=False, depth_min=0.1, depth_max=10.0, window_size=0.001, image_type='pdf', force=False, generate=False, dist_percent=0.001):
+def GCI(hifi=[], nano=[], directory='.', prefix='GCI', threads=1, map_qual=30, iden_percent=0.9, ovlp_percent=0.9, clip_percent=0.1, flank_len=10, threshold=0, plot=False, depth_min=0.1, depth_max=10.0, window_size=0.001, image_type='png', force=False, generate=False, dist_percent=0.001):
 	if directory.endswith('/'):
 		directory = directory.split('/')[0]
 	if os.path.exists(directory):
@@ -620,10 +631,10 @@ def GCI(hifi=[], nano=[], directory='.', prefix='GCI', threads=1, map_qual=30, i
 
 if __name__=='__main__':
 	###########################
-	### version = 1.5
+	### version = 1.0
 	### this version have some limits: -t
 	###########################
-	version = 'GCI version 1.5'
+	version = 'GCI version 1.0'
 
 	parser = argparse.ArgumentParser(prog=sys.argv[0], add_help=False, formatter_class=argparse.RawDescriptionHelpFormatter, description='A program for assessing the T2T genome', epilog='Examples:\npython GCI.py --hifi hifi.bam hifi.paf ... --nano nano.bam nano.paf ...')
 
@@ -648,7 +659,7 @@ if __name__=='__main__':
 	group_po.add_argument('-dmin', '--depth-min', metavar='FLOAT', type=float, help='Minimum depth in folds of mean coverage for plotting [0.1]', default=0.1)
 	group_po.add_argument('-dmax', '--depth-max', metavar='FLOAT', type=float, help='Maximum depth in folds of mean coverage for plotting [10.0]', default=10.0)
 	group_po.add_argument('-ws', '--window-size', metavar='FLOAT', type=float, help='The window size in chromosome units (0-1) when plotting [0.001]', default=0.001)
-	group_po.add_argument('-it', '--image-type', metavar='STR', help='The format of the output images: pdf or png [pdf]', default='pdf')
+	group_po.add_argument('-it', '--image-type', metavar='STR', help='The format of the output images: png or pdf [png]', default='png')
 
 	group_op = parser.add_argument_group("Other Options")
 	group_op.add_argument('-g', '--generate', action='store_const', help='Generate the depth files', const=True, default=False)
