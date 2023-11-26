@@ -79,7 +79,7 @@ Plot Options:
   -ws FLOAT, --window-size FLOAT
                         The window size in chromosome units (0-1) when plotting [0.001]
   -it STR, --image-type STR
-                        The format of the output images: pdf or png [pdf]
+                        The format of the output images: png or pdf [png]
 
 Other Options:
   -g, --generate        Generate the depth files
@@ -164,11 +164,11 @@ python GCI.py --hifi hifi.bam hifi.paf (--nano ont.bam ont.paf) -d mat -o mat -t
 
 ### Benchmark
 We benchmarked GCI in many genomes:
-| Type of reads     | CHM13 | CN1 | 
-| ------------------| ----- | --- |
-| HiFi (depth; GCI) | xxxxx | xxx |
-| Nano (depth; GCI) | xxxxx | xxx |
-| HiFi + Nano       | xxxxx | xxx |
+| Type of reads     | CHM13 | CN1 | HG002 | 
+| ------------------| ----- | --- | ----- |
+| HiFi (depth; GCI) | xxxxx | xxx | xxxxx |
+| Nano (depth; GCI) | xxxxx | xxx | xxxxx |
+| HiFi + Nano       | xxxxx | xxx | xxxxx |
 ### Utility
 - filter_bam.py
   - Usage
