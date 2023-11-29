@@ -200,11 +200,18 @@ def filter(paf_files=[], bam_files=[], prefix=None, map_qual=30, iden_percent=0.
 
 def bamsnap(files=[], output_files=[], reference=None, region=None, regions_file=None, directory='.', prefix='bamsnap', force=False):
 	"""
-	usage:
+	usage: visualize the alignments
 
-	input:
+	input: bam file(s),
+		   the file names of the filtered bam file(s),
+		   the reference file,
+		   the region to plot,
+		   the regions file,
+		   the path to output,
+		   the prefix of the output,
+		   whether to rewrite the existing files (force)
 
-	output:
+	output: the plots
 	"""
 
 	final_files = []
@@ -274,7 +281,7 @@ def preprocessing(files=[], directory='.', prefix='bamsnap', threads=1, map_qual
 
 
 if __name__=='__main__':
-	###! this version can't plot and use multiple threads (-p, -t)
+	###! this version can't plot and use multiple threads (-t)
 
 	parser = argparse.ArgumentParser(prog=sys.argv[0], add_help=False, formatter_class=argparse.RawDescriptionHelpFormatter, description='This is the core part of the main program GCI.py with additional functions\nYou can provide some bam and paf files (like GCI.py) and set the filtered parameters\nand then you will get the filtered bam file which can be used for subsequent analysis', epilog='Examples:\npython filter_bam.py bam1 paf1 ...')
 
