@@ -591,13 +591,15 @@ def GCI(hifi=[], nano=[], directory='.', prefix='GCI', threads=1, map_qual=30, i
 		depths, targets_length = filter(hifi_paf, hifi_bam, prefix, map_qual, iden_percent, clip_percent, ovlp_percent, flank_len, directory, force, generate)
 		merged_depth_bed = merge_depth(depths, prefix, threshold, flank_len, directory, force)
 		compute_index(targets_length, prefix, directory, force, [merged_depth_bed], ['HiFi'], flank_len, dist_percent)
-		plot_depth([depths], depth_min, depth_max, window_size, image_type, directory, prefix, force)
+		if plot == True:
+			plot_depth([depths], depth_min, depth_max, window_size, image_type, directory, prefix, force)
 
 	elif hifi == None:
 		depths, targets_length = filter(nano_paf, nano_bam, prefix, map_qual, iden_percent, clip_percent, ovlp_percent, flank_len, directory, force, generate)
 		merged_depth_bed = merge_depth(depths, prefix, threshold, flank_len, directory, force)
 		compute_index(targets_length, prefix, directory, force, [merged_depth_bed], ['Nano'], flank_len, dist_percent)
-		plot_depth([depths], depth_min, depth_max, window_size, image_type, directory, prefix, force)
+		if plot == True:
+			plot_depth([depths], depth_min, depth_max, window_size, image_type, directory, prefix, force)
 	
 	else:
 		hifi_refs = []
@@ -624,7 +626,8 @@ def GCI(hifi=[], nano=[], directory='.', prefix='GCI', threads=1, map_qual=30, i
 		nano_merged_depth_bed = merge_depth(nano_depths, prefix+'_nano', threshold, flank_len, directory, force)
 		two_type_merged_depth_bed = merge_depth(merged_two_type_depths, prefix+'_two_type', threshold, flank_len, directory, force)
 		compute_index(targets_length, prefix, directory, force, [hifi_merged_depth_bed, nano_merged_depth_bed, two_type_merged_depth_bed], ['HiFi', 'Nano', 'HiFi + Nano'], flank_len, dist_percent)
-		plot_depth([hifi_depths, nano_depths], depth_min, depth_max, window_size, image_type, directory, prefix, force)
+		if plot == True:
+			plot_depth([hifi_depths, nano_depths], depth_min, depth_max, window_size, image_type, directory, prefix, force)
 
 
 if __name__=='__main__':
