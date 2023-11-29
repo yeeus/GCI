@@ -58,7 +58,7 @@ def merge_alns_properties(alns, x, y):
 	return mapped_length, sort_bed_list[0][0], high_est
 
 
-def filter(paf_files=[], bam_files=[], prefix='GCI', map_qual=30, iden_percent=0.9, clip_percent=0.1, ovlp_percent=0.9, directory='.', force=False):
+def filter(paf_files=[], bam_files=[], prefix=None, map_qual=30, iden_percent=0.9, clip_percent=0.1, ovlp_percent=0.9, directory='.', force=False):
 	"""
 	usage: filter the paf and bam file(s) based on many metrics and output the filtered bam file(s)
 
@@ -73,15 +73,14 @@ def filter(paf_files=[], bam_files=[], prefix='GCI', map_qual=30, iden_percent=0
 	
 	output: the filtered bam file(s)
 
-	return: the whole-genome depth dictionary,
-			one dictionary keyed by the targets with the length value
+	return: the file names of the filtered bam file(s)
 	"""
 	
 	output_files = []
 	output_files_name = []
 	samfile = pysam.AlignmentFile(bam_files[0], 'rb')
 	for i, file in enumerate(bam_files):
-		if isinstance(prefix, str):
+		if prefix == None:
 			if os.path.exists(f'{directory}/{".".join(file.split(".")[:-1])}.filter.bam') and force == False:
 				print(f'ERROR!!! The file "{directory}/{".".join(file.split(".")[:-1])}.filter.bam" exists\nPlease using "-f" or "--force" to rewrite', file=sys.stderr)
 				raise SystemExit
@@ -193,10 +192,50 @@ def filter(paf_files=[], bam_files=[], prefix='GCI', map_qual=30, iden_percent=0
 	for file in output_files_name:
 		random_string = ''.join(random.choices(string.ascii_letters + string.digits, k=10))
 		subprocess.run(f'samtools sort {file} -o {directory}/{random_string}.bam', shell=True, capture_output=True, check=True)
-		subprocess.run(f'mv {directory}/{random_string}.bam {file}', shell=True, capture_output=True)
+		subprocess.run(f'mv {directory}/{random_string}.bam {file}', shell=True, capture_output=True, check=True)
+		subprocess.run(f'samtools index {file}', shell=True, capture_output=True, check=True)
+
+	return output_files_name
 
 
-def preprocessing(files=[], directory='.', prefix='GCI', threads=1, map_qual=30, iden_percent=0.9, ovlp_percent=0.9, clip_percent=0.1, plot=False, region='', regions_file='', force=False):
+def bamsnap(files=[], output_files=[], reference=None, region=None, regions_file=None, directory='.', prefix='bamsnap', force=False):
+	"""
+	usage:
+
+	input:
+
+	output:
+	"""
+
+	final_files = []
+	for (file, output_file) in zip(files, output_files):
+		final_files.append(file)
+		final_files.append(output_file)
+	
+	bam_argument = ' '.join(final_files)
+	title_arguments = ' '.join([f'"{file}"' for file in final_files])
+	if region != None:
+		if os.path.exists(f'{directory}/{prefix}.png') and force == False:
+			print(f'ERROR!!! The file "{directory}/{prefix}.png" exists\nPlease using "-f" or "--force" to rewrite', file=sys.stderr)
+			raise SystemExit
+		subprocess.run(f'bamsnap -bam {bam_argument} -title {title_arguments} -pos {region} -margin 100 -out {directory}/{prefix}.png -ref {reference} -draw coordinates bamplot base -bamplot coverage read -read_color_by strand', shell=True, check=True)
+	
+	elif regions_file != None:
+		if prefix.endswith('/'):
+			prefix = prefix.split('/')[0]
+		if os.path.exists(f'{directory}/{prefix}'):
+			if not os.access(f'{directory}/{prefix}', os.R_OK):
+				print(f'ERROR!!! The path "{directory}/{prefix}" is unable to read', file=sys.stderr)
+				raise SystemExit
+			if not os.access(f'{directory}/{prefix}', os.W_OK):
+				print(f'ERROR!!! The path "{directory}/{prefix}" is unable to write', file=sys.stderr)
+				raise SystemExit
+		else:
+			os.makedirs(f'{directory}/{prefix}')
+		subprocess.run(f'bamsnap -bam {bam_argument} -title {title_arguments} -bed {regions_file} -margin 100 -out {directory}/{prefix} -save_image_only -ref {reference} -draw coordinates bamplot base -bamplot coverage read -read_color_by strand', shell=True, check=True)
+
+
+def preprocessing(files=[], directory='.', prefix='bamsnap', threads=1, map_qual=30, iden_percent=0.9, ovlp_percent=0.9, clip_percent=0.1, plot=False, reference=None, region=None, regions_file=None, force=False):
 	if directory.endswith('/'):
 		directory = directory.split('/')[0]
 	if os.path.exists(directory):
@@ -213,13 +252,25 @@ def preprocessing(files=[], directory='.', prefix='GCI', threads=1, map_qual=30,
 	bam_files = []
 	paf_files = []
 	for file in files:
-		CompletedProcess = subprocess.run(f'file -r {file}', shell=True, check=True, capture_output=True)
-		if 'gzip' in str(CompletedProcess.stdout):
+		if file.endswith('.bam'):
 			bam_files.append(file)
 		else:
 			paf_files.append(file)
 	
-	filter(paf_files, bam_files, prefix, map_qual, iden_percent, clip_percent, ovlp_percent, directory, force)
+
+	if plot == True:
+		if isinstance(prefix, str):
+			prefix = [prefix]
+		if len(prefix) == 1:
+			output_files_name = filter(paf_files, bam_files, None, map_qual, iden_percent, clip_percent, ovlp_percent, directory, force)
+		else:
+			output_files_name = filter(paf_files, bam_files, prefix[:-1], map_qual, iden_percent, clip_percent, ovlp_percent, directory, force)
+		bamsnap(bam_files, output_files_name, reference, region, regions_file, directory, prefix[-1], force)
+	else:
+		if isinstance(prefix, str):
+			output_files_name = filter(paf_files, bam_files, None, map_qual, iden_percent, clip_percent, ovlp_percent, directory, force)
+		else:
+			output_files_name = filter(paf_files, bam_files, prefix, map_qual, iden_percent, clip_percent, ovlp_percent, directory, force)
 
 
 if __name__=='__main__':
@@ -230,7 +281,7 @@ if __name__=='__main__':
 	group_io = parser.add_argument_group("Input/Output")
 	group_io.add_argument('files', nargs='+', metavar='ALIGNMENT-FILE', help='Long reads alignment files (at least one bam file)')
 	group_io.add_argument('-d', dest='directory', metavar='PATH', help='The directory of output files [.]', default='.')
-	group_io.add_argument('-o', '--output', nargs='*', dest='prefix', metavar='STR', help='Prefix of output files; one prefix corresponds to one bam file in order and if provide the parameter "-p", the last one was used as the prefix for bamsnap outputs [[$input.filter] for filtered bam files and [GCI] for bamsnap outputs]', default='GCI')
+	group_io.add_argument('-o', '--output', nargs='*', dest='prefix', metavar='STR', help='Prefix of output files; one prefix corresponds to one bam file in order and if provide the parameter "-p", the last one is used as the prefix for bamsnap outputs (output directory if inputting the regions file) [[$input.filter] for filtered bam files and [bamsnap] for bamsnap outputs]', default='bamsnap')
 	group_io.add_argument('-t', '--threads', metavar='INT', type=int, help='Number of threads [1]', default=1)
 
 	group_fo = parser.add_argument_group("Filter Options")
@@ -241,6 +292,7 @@ if __name__=='__main__':
 
 	group_po = parser.add_argument_group("Plot Options")
 	group_po.add_argument('-p', '--plot', action='store_const', help='Visualize the filtered bam files', const=True, default=False)
+	group_po.add_argument('-ref', '--reference', metavar='FILE', help='The reference file')
 	group_po.add_argument('-r', '--region', metavar='STR', help='The region to plot in chr:pos or chr:start-end format')
 	group_po.add_argument('-R', '--regions-file', metavar='FILE', help='Bed file contains the regions to plot')
 
@@ -254,8 +306,7 @@ if __name__=='__main__':
 	bam_num = 0
 	for file in args['files']:
 		if os.path.exists(file) and os.access(file, os.R_OK):
-			CompletedProcess = subprocess.run(f'file -r {file}', shell=True, check=True, capture_output=True)
-			if 'gzip' in str(CompletedProcess.stdout):
+			if file.endswith('.bam'):
 				bam_num += 1
 		else:
 			print(f'ERROR!!! "{file}" is not an available file', file=sys.stderr)
@@ -266,7 +317,7 @@ if __name__=='__main__':
 	
 	if isinstance(args['prefix'], str):
 		pass
-	elif len(args['prefix']) ==0:
+	elif len(args['prefix']) == 0:
 		print('ERROR!!! Please input at least one prefix\nPlease read the help message using "-h" or "--help"', file=sys.stderr)
 		raise SystemExit
 	elif (args['plot'] == False):
@@ -274,8 +325,19 @@ if __name__=='__main__':
 			print(f'ERROR!!! The number of prefixes and bam files is inconsistent\nPlease read the help message using "-h" or "--help"', file=sys.stderr)
 			raise SystemExit
 	elif (args['plot'] == True):
-		if len(args['prefix']) != (bam_num + 1):
-			print(f'ERROR!!! Expect {bam_num + 1} prefixes but only provide {len(args["prefix"])}\nPlease read the help message using "-h" or "--help"', file=sys.stderr)
+		if len(args['prefix']) == 1:
+			pass
+		elif len(args['prefix']) != (bam_num + 1):
+			print(f'ERROR!!! Expect {bam_num + 1} prefixes but provide {len(args["prefix"])}\nPlease read the help message using "-h" or "--help"', file=sys.stderr)
 			raise SystemExit
 
+
+	if args['plot'] == True :
+		if args['reference'] == None:
+			print(f'ERROR!!! Please input the reference file\nPlease read the help message using "-h" or "--help"', file=sys.stderr)
+			raise SystemExit
+		if (args['region'] == None) and (args['regions_file'] == None):
+			print(f'ERROR!!! Please provide the genomic positions (or in bed format)\nPlease read the help message using "-h" or "--help"', file=sys.stderr)
+			raise SystemExit
+	
 	preprocessing(**args)
