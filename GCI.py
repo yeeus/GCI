@@ -575,15 +575,13 @@ def GCI(hifi=[], nano=[], directory='.', prefix='GCI', threads=1, map_qual=30, i
 	nano_paf = []
 	if hifi != None:
 		for file in hifi:
-			CompletedProcess = subprocess.run(f'file -r {file}', shell=True, check=True, capture_output=True)
-			if 'gzip' in str(CompletedProcess.stdout):
+			if file.endswith('.bam'):
 				hifi_bam.append(file)
 			else:
 				hifi_paf.append(file)
 	if nano != None:
 		for file in nano:
-			CompletedProcess = subprocess.run(f'file -r {file}', shell=True, check=True, capture_output=True)
-			if 'gzip' in str(CompletedProcess.stdout):
+			if file.endswith('.bam'):
 				nano_bam.append(file)
 			else:
 				nano_paf.append(file)
@@ -678,8 +676,7 @@ if __name__=='__main__':
 		bam_num = 0
 		for file in args['hifi']:
 			if os.path.exists(file) and os.access(file, os.R_OK):
-				CompletedProcess = subprocess.run(f'file -r {file}', shell=True, check=True, capture_output=True)
-				if 'gzip' in str(CompletedProcess.stdout):
+				if file.endswith('.bam'):
 					bam_num += 1
 			else:
 				print(f'ERROR!!! "{file}" is not an available file', file=sys.stderr)
@@ -692,8 +689,7 @@ if __name__=='__main__':
 		bam_num = 0
 		for file in args['nano']:
 			if os.path.exists(file) and os.access(file, os.R_OK):
-				CompletedProcess = subprocess.run(f'file -r {file}', shell=True, check=True, capture_output=True)
-				if 'gzip' in str(CompletedProcess.stdout):
+				if file.endswith('.bam'):
 					bam_num += 1
 			else:
 				print(f'ERROR!!! "{file}" is not an available file', file=sys.stderr)
