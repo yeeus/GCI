@@ -149,6 +149,7 @@ python GCI.py --hifi hifi.bam hifi.paf (--nano ont.bam ont.paf) -d mat -o mat -t
     - ${prefix}.gci ## an index file containing the reads type, expected N50, observed N50, expected number of contigs, observed number of contigs, genome continuity index
     - (images/) ## the depth plots across the whole chromosome (if providing the parameter **-p**)
       -  ${prefix}.${target}.${image_type}
+      > ![https://github.com/yeeus/GCI/images/MH63.chr01.png](https://github.com/yeeus/GCI/blob/main/images/MH63.chr01.png)
   
 #### providing two types
 - ${dictionay}/
@@ -161,6 +162,7 @@ python GCI.py --hifi hifi.bam hifi.paf (--nano ont.bam ont.paf) -d mat -o mat -t
   - ${prefix}.gci
   - (images/)
     - ${prefix}.${target}.${image_type}
+    > ![https://github.com/yeeus/GCI/images/chm13.chr19.png](https://github.com/yeeus/GCI/blob/main/images/chm13.chr19.png)
 
 ### Benchmark
 We benchmarked GCI in many genomes:
