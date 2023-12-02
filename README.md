@@ -41,8 +41,8 @@ As for **GCI**, it requires:
 ```
 python GCI.py --help
 
-usage: GCI.py [--hifi  [...]] [--nano  [...]] [-ts INT] [-dp FLOAT] [-d PATH] [-o STR] [-t INT] [-mq INT] [-ip FLOAT] [-op FLOAT]
-              [-cp FLOAT] [-fl INT] [-p] [-dmin FLOAT] [-dmax FLOAT] [-ws FLOAT] [-it STR] [-g] [-f] [-h] [-v]
+usage: GCI.py [--hifi  [...]] [--nano  [...]] [-ts INT] [-dp FLOAT] [-d PATH] [-o STR] [-t INT] [-mq INT] [--mq-cutoff INT] [-ip FLOAT]
+              [-op FLOAT] [-cp FLOAT] [-fl INT] [-p] [-dmin FLOAT] [-dmax FLOAT] [-ws FLOAT] [-it STR] [-g] [-f] [-h] [-v]
 
 A program for assessing the T2T genome
 
@@ -61,6 +61,7 @@ Input/Output:
 Filter Options:
   -mq INT, --map-qual INT
                         Minium mapping quality for alignments [30]
+  --mq-cutoff INT       The cutoff of mapping quality for keeping the alignment [50]
   -ip FLOAT, --iden-percent FLOAT
                         Minimum identity (num_match_res/len_aln) of the reads [0.9]
   -op FLOAT, --ovlp-percent FLOAT
@@ -68,7 +69,7 @@ Filter Options:
   -cp FLOAT, --clip-percent FLOAT
                         Maximum clipped percentage of the reads [0.1]
   -fl INT, --flank-len INT
-                        The flanking length of the clipped bases [10]
+                        The flanking length of the clipped bases [15]
 
 Plot Options:
   -p, --plot            Visualize the finally filtered whole genome depth
