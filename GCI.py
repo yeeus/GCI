@@ -29,21 +29,21 @@ def merge_alns_properties(alns, x, y):
 	"""
 	usage: merge overlapped aligned blocks of either query or target based on the inputted parameters x and y
 
-	input: ynteny[query][target] from function filter(),
+	input: synteny[query][target] from function filter(),
 		   query (1, 2) or target (3, 4)
 
-	return: mapped_length of the query (inputting 1, 2), the lowest and highest position of target (inputting 3, 4)
+	return: mapped_length of the query (inputting 1, 2), the leftmost and rightmost position of target (inputting 3, 4)
 	"""
 
 	# extract bed list form alns
 	bed_list = []
 	for a in alns:
 		bed_list.append([a[x], a[y]])
-
-	# merge bed to generate non-overlap blocks
-	mapped_length = 0
 	sort_bed_list = sorted(bed_list)
-
+	# merge bed to generate non-overlap blocks
+	
+	target_length = []
+	mapped_length = 0
 	low_est = sort_bed_list[0][0]
 	high_est = sort_bed_list[0][1]
 
@@ -53,13 +53,17 @@ def merge_alns_properties(alns, x, y):
 			if high_est < high:
 				high_est = high
 		else:
+			target_length.append((high_est-low_est, low_est, high_est))
 			mapped_length += (high_est - low_est)
 			low_est, high_est = sort_bed_list[index]
+	target_length.append((high_est-low_est, low_est, high_est))
 	mapped_length += (high_est - low_est)
-	return mapped_length, sort_bed_list[0][0], high_est
+
+	target_length = sorted(target_length, key=lambda x:x[0], reverse=True)
+	return mapped_length, target_length[0][1], target_length[0][2]
 
 
-def filter(paf_files=[], bam_files=[], prefix='GCI', map_qual=30, iden_percent=0.9, clip_percent=0.1, ovlp_percent=0.9, flank_len=10, directory='.', force=False, generate=False):
+def filter(paf_files=[], bam_files=[], prefix='GCI', map_qual=30, mq_cutoff=50, iden_percent=0.9, clip_percent=0.1, ovlp_percent=0.9, flank_len=15, directory='.', force=False, generate=False):
 	"""
 	usage: filter the paf and bam file(s) based on many metrics(, and finally generate the depth file)
 
@@ -67,6 +71,7 @@ def filter(paf_files=[], bam_files=[], prefix='GCI', map_qual=30, iden_percent=0
 		   bam file(s),
 		   the prefix of output depth file,
 		   the filtered mapping quality,
+		   the cutoff of mapping quality,
 		   the filtered identity percentage,
 		   the filtered clipped percentage (S / (M + I + S)),
 		   the filtered overlapping percentage (overlap/length),
@@ -85,6 +90,7 @@ def filter(paf_files=[], bam_files=[], prefix='GCI', map_qual=30, iden_percent=0
 			print(f'ERROR!!! The file "{directory}/{prefix}.depth" exists\nPlease using "-f" or "--force" to rewrite', file=sys.stderr)
 			raise SystemExit
 	
+	high_qual_querys = set()
 	paf_lines = [{} for i in range(len(paf_files))]
 	if len(paf_files) != 0:
 		synteny = {}
@@ -110,6 +116,8 @@ def filter(paf_files=[], bam_files=[], prefix='GCI', map_qual=30, iden_percent=0
 						if target not in synteny[query].keys():
 							synteny[query][target] = []
 						synteny[query][target].append((query_length, query_start, query_end, target_start, target_end, identity))
+						if mapq >= mq_cutoff:
+							high_qual_querys.add(query)
 				for query in synteny.keys():
 					mapping_results = {}
 					for target in synteny[query].keys():
@@ -117,7 +125,6 @@ def filter(paf_files=[], bam_files=[], prefix='GCI', map_qual=30, iden_percent=0
 						non_overlap_qry_aligned, _, _ = merge_alns_properties(alns, 1, 2)
 						query_length = alns[0][0]
 						alignrate = non_overlap_qry_aligned / query_length
-						#? if alignrate >= xxx 
 						average_identity = get_average_identity(alns)
 						score = average_identity * alignrate
 						_, start, end = merge_alns_properties(alns, 3, 4)
@@ -145,16 +152,19 @@ def filter(paf_files=[], bam_files=[], prefix='GCI', map_qual=30, iden_percent=0
 				mm = NM - (I + D)
 				if (S/(M+I+S) <= clip_percent) and ((M-mm)/(M+I+D) >= iden_percent):
 					samfile_dicts[i][segment.query_name] = (segment.reference_name, segment.reference_start, segment.reference_end, segment.query_length)
+					if segment.mapping_quality >= mq_cutoff:
+						high_qual_querys.add(segment.query_name)
 		samfile.close()
+
 
 	files = paf_lines + samfile_dicts
 	if len(files) > 1:
 		files_sets = []
 		for file in files:
 			files_sets.append(set(file.keys()))
-		querys = set.intersection(*files_sets)
+		comm_querys = set.intersection(*files_sets)
 
-		file1 = {query:segment for query, segment in files[0].items() if query in querys}
+		file1 = {query:segment for query, segment in files[0].items() if query in (high_qual_querys | comm_querys)}
 		for file in files[1:]:
 			for query, segment in file.items():
 				if query in file1.keys():
@@ -170,6 +180,8 @@ def filter(paf_files=[], bam_files=[], prefix='GCI', map_qual=30, iden_percent=0
 							del file1[query]
 						else:
 							file1[query] = (segment1[0], max(start1, start2), min(end1, end2))
+				elif query in high_qual_querys:
+					file1.update({query:(segment[0], start1, end1)})
 	else:
 		file1 = files[0]
 	for segment in file1.values():
@@ -225,7 +237,7 @@ def merge_two_type_depth(hifi_depths={}, nano_depths={}, prefix='GCI', directory
 	return merged_two_type_depths
 
 
-def collapse_depth_range(depths={}, leftmost=-1, rightmost=0, flank_len=10):
+def collapse_depth_range(depths={}, leftmost=-1, rightmost=0, flank_len=15):
 	"""
 	usage: collapse positions with depth in the range (leftmost, rightmost]
 
@@ -260,7 +272,7 @@ def collapse_depth_range(depths={}, leftmost=-1, rightmost=0, flank_len=10):
 	return merged_depths_bed
 
 
-def merge_depth(depths={}, prefix='GCI', threshold=0, flank_len=10, directory='.', force=False):
+def merge_depth(depths={}, prefix='GCI', threshold=0, flank_len=15, directory='.', force=False):
 	"""
 	usage: merge positions with depth lower than the threshold (used in the main function and based on the function collapse_depth_range)
 
@@ -288,7 +300,7 @@ def merge_depth(depths={}, prefix='GCI', threshold=0, flank_len=10, directory='.
 	return merged_depths_bed
 
 
-def complement_merged_depth(merged_depths_bed={}, targets_length={}, flank_len=10):
+def complement_merged_depth(merged_depths_bed={}, targets_length={}, flank_len=15):
 	"""
 	usage: generate the complement of the merged_depth
 
@@ -320,7 +332,7 @@ def complement_merged_depth(merged_depths_bed={}, targets_length={}, flank_len=1
 	return lengths_com_merged_depth
 
 
-def compute_index(targets_length={}, prefix='GCI', directory='.', force=False, merged_depths_bed_list=[], type_list=[], flank_len=10, dist_percent=0.001):
+def compute_index(targets_length={}, prefix='GCI', directory='.', force=False, merged_depths_bed_list=[], type_list=[], flank_len=15, dist_percent=0.001):
 	"""
 	usage: remove the regions with depth lower than the threshold and compute the index
 
@@ -537,7 +549,7 @@ def plot_depth(depths_list=[], depth_min=0.1, depth_max=10.0, window_size=0.001,
 		plt.close()
 
 
-def GCI(hifi=[], nano=[], directory='.', prefix='GCI', threads=1, map_qual=30, iden_percent=0.9, ovlp_percent=0.9, clip_percent=0.1, flank_len=10, threshold=0, plot=False, depth_min=0.1, depth_max=10.0, window_size=0.001, image_type='png', force=False, generate=False, dist_percent=0.001):
+def GCI(hifi=[], nano=[], directory='.', prefix='GCI', threads=1, map_qual=30, mq_cutoff=50, iden_percent=0.9, ovlp_percent=0.9, clip_percent=0.1, flank_len=15, threshold=0, plot=False, depth_min=0.1, depth_max=10.0, window_size=0.001, image_type='png', force=False, generate=False, dist_percent=0.001):
 	if directory.endswith('/'):
 		directory = directory.split('/')[0]
 	if os.path.exists(directory):
@@ -588,14 +600,14 @@ def GCI(hifi=[], nano=[], directory='.', prefix='GCI', threads=1, map_qual=30, i
 	
 
 	if nano == None:
-		depths, targets_length = filter(hifi_paf, hifi_bam, prefix, map_qual, iden_percent, clip_percent, ovlp_percent, flank_len, directory, force, generate)
+		depths, targets_length = filter(hifi_paf, hifi_bam, prefix, map_qual, mq_cutoff, iden_percent, clip_percent, ovlp_percent, flank_len, directory, force, generate)
 		merged_depth_bed = merge_depth(depths, prefix, threshold, flank_len, directory, force)
 		compute_index(targets_length, prefix, directory, force, [merged_depth_bed], ['HiFi'], flank_len, dist_percent)
 		if plot == True:
 			plot_depth([depths], depth_min, depth_max, window_size, image_type, directory, prefix, force)
 
 	elif hifi == None:
-		depths, targets_length = filter(nano_paf, nano_bam, prefix, map_qual, iden_percent, clip_percent, ovlp_percent, flank_len, directory, force, generate)
+		depths, targets_length = filter(nano_paf, nano_bam, prefix, map_qual, mq_cutoff, iden_percent, clip_percent, ovlp_percent, flank_len, directory, force, generate)
 		merged_depth_bed = merge_depth(depths, prefix, threshold, flank_len, directory, force)
 		compute_index(targets_length, prefix, directory, force, [merged_depth_bed], ['Nano'], flank_len, dist_percent)
 		if plot == True:
@@ -618,8 +630,8 @@ def GCI(hifi=[], nano=[], directory='.', prefix='GCI', threads=1, map_qual=30, i
 			raise SystemExit
 		
 
-		hifi_depths, targets_length = filter(hifi_paf, hifi_bam, prefix+'_hifi', map_qual, iden_percent, clip_percent, ovlp_percent, flank_len, directory, force, generate)
-		nano_depths, targets_length = filter(nano_paf, nano_bam, prefix+'_nano', map_qual, iden_percent, clip_percent, ovlp_percent, flank_len, directory, force, generate)
+		hifi_depths, targets_length = filter(hifi_paf, hifi_bam, prefix+'_hifi', map_qual, mq_cutoff, iden_percent, clip_percent, ovlp_percent, flank_len, directory, force, generate)
+		nano_depths, targets_length = filter(nano_paf, nano_bam, prefix+'_nano', map_qual, mq_cutoff, iden_percent, clip_percent, ovlp_percent, flank_len, directory, force, generate)
 		merged_two_type_depths = merge_two_type_depth(hifi_depths, nano_depths, prefix+'_two_type', directory, force, generate)
 
 		hifi_merged_depth_bed = merge_depth(hifi_depths, prefix+'_hifi', threshold, flank_len, directory, force)
@@ -650,10 +662,11 @@ if __name__=='__main__':
 
 	group_fo = parser.add_argument_group("Filter Options")
 	group_fo.add_argument('-mq', '--map-qual', metavar='INT', type=int, help='Minium mapping quality for alignments [30]', default=30)
+	group_fo.add_argument('--mq-cutoff', metavar='INT', type=int, help='The cutoff of mapping quality for keeping the alignment [50]', default=50)
 	group_fo.add_argument('-ip', '--iden-percent', metavar='FLOAT', type=float, help='Minimum identity (num_match_res/len_aln) of the reads [0.9]', default=0.9)
 	group_fo.add_argument('-op', '--ovlp-percent', metavar='FLOAT', type=float, help='Minimum overlapping percentage of the reads if inputting more than one alignment files [0.9]', default=0.9)
 	group_fo.add_argument('-cp', '--clip-percent', metavar='FLOAT', type=float, help='Maximum clipped percentage of the reads [0.1]', default=0.1)
-	group_fo.add_argument('-fl', '--flank-len', metavar='INT', type=int, help='The flanking length of the clipped bases [10]', default=10)
+	group_fo.add_argument('-fl', '--flank-len', metavar='INT', type=int, help='The flanking length of the clipped bases [15]', default=15)
 
 	group_po = parser.add_argument_group("Plot Options")
 	group_po.add_argument('-p', '--plot', action='store_const', help='Visualize the finally filtered whole genome depth', const=True, default=False)
@@ -701,4 +714,7 @@ if __name__=='__main__':
 			print('ERROR!!! Please input at least one Oxford Nanopore long reads bam file\nPlease read the help message using "-h" or "--help"', file=sys.stderr)
 			raise SystemExit
 	
+	if args['map_qual'] > args['mq_cutoff']:
+		print(f'WARNING!!! The minium mapping quality is {args["map_qual"]} and higher than the cutoff {args["mq_cutoff"]}, which means that wouldn\'t filter any reads\nPlease read the help message using "-h" or "--help"', file=sys.stdout)
+
 	GCI(**args)
