@@ -38,11 +38,11 @@ def merge_alns_properties(alns, x, y):
 	bed_list = []
 	for a in alns:
 		bed_list.append([a[x], a[y]])
-
-	# merge bed to generate non-overlap blocks
-	mapped_length = 0
 	sort_bed_list = sorted(bed_list)
-
+	# merge bed to generate non-overlap blocks
+	
+	target_length = []
+	mapped_length = 0
 	low_est = sort_bed_list[0][0]
 	high_est = sort_bed_list[0][1]
 
@@ -52,19 +52,24 @@ def merge_alns_properties(alns, x, y):
 			if high_est < high:
 				high_est = high
 		else:
+			target_length.append((high_est-low_est, low_est, high_est))
 			mapped_length += (high_est - low_est)
 			low_est, high_est = sort_bed_list[index]
+	target_length.append((high_est-low_est, low_est, high_est))
 	mapped_length += (high_est - low_est)
-	return mapped_length, sort_bed_list[0][0], high_est
+
+	target_length = sorted(target_length, key=lambda x:x[0], reverse=True)
+	return mapped_length, target_length[0][1], target_length[0][2]
 
 
-def filter(paf_files=[], bam_files=[], prefix=None, map_qual=30, iden_percent=0.9, clip_percent=0.1, ovlp_percent=0.9, directory='.', force=False):
+def filter(paf_files=[], bam_files=[], prefix=None, map_qual=30, mq_cutoff=50, iden_percent=0.9, clip_percent=0.1, ovlp_percent=0.9, directory='.', force=False):
 	"""
 	usage: filter the paf and bam file(s) based on many metrics and output the filtered bam file(s)
 
 	input: paf file(s),
 		   bam file(s),
 		   the filtered mapping quality,
+		   the cutoff of mapping quality,
 		   the filtered identity percentage,
 		   the filtered clipped percentage (S / (M + I + S)),
 		   the filtered overlapping percentage (overlap/length),
@@ -96,6 +101,7 @@ def filter(paf_files=[], bam_files=[], prefix=None, map_qual=30, iden_percent=0.
 	samfile.close()
 
 
+	high_qual_querys = set()
 	paf_lines = [{} for i in range(len(paf_files))]
 	if len(paf_files) != 0:
 		synteny = {}
@@ -121,6 +127,8 @@ def filter(paf_files=[], bam_files=[], prefix=None, map_qual=30, iden_percent=0.
 						if target not in synteny[query].keys():
 							synteny[query][target] = []
 						synteny[query][target].append((query_length, query_start, query_end, target_start, target_end, identity))
+						if mapq >= mq_cutoff:
+							high_qual_querys.add(query)
 				for query in synteny.keys():
 					mapping_results = {}
 					for target in synteny[query].keys():
@@ -128,7 +136,6 @@ def filter(paf_files=[], bam_files=[], prefix=None, map_qual=30, iden_percent=0.
 						non_overlap_qry_aligned, _, _ = merge_alns_properties(alns, 1, 2)
 						query_length = alns[0][0]
 						alignrate = non_overlap_qry_aligned / query_length
-						#? if alignrate >= xxx 
 						average_identity = get_average_identity(alns)
 						score = average_identity * alignrate
 						_, start, end = merge_alns_properties(alns, 3, 4)
@@ -151,6 +158,8 @@ def filter(paf_files=[], bam_files=[], prefix=None, map_qual=30, iden_percent=0.
 				mm = NM - (I + D)
 				if (S/(M+I+S) <= clip_percent) and ((M-mm)/(M+I+D) >= iden_percent):
 					samfile_dicts[i][segment.query_name] = (segment.reference_name, segment.reference_start, segment.reference_end, segment.query_length)
+					if segment.mapping_quality >= mq_cutoff:
+						high_qual_querys.add(segment.query_name)
 		samfile.close()
 
 
@@ -159,9 +168,9 @@ def filter(paf_files=[], bam_files=[], prefix=None, map_qual=30, iden_percent=0.
 		files_sets = []
 		for file in files:
 			files_sets.append(set(file.keys()))
-		querys = set.intersection(*files_sets)
+		comm_querys = set.intersection(*files_sets)
 
-		file1 = {query:segment for query, segment in files[0].items() if query in querys}
+		file1 = {query:segment for query, segment in files[0].items() if query in (high_qual_querys | comm_querys)}
 		for file in files[1:]:
 			for query, segment in file.items():
 				if query in file1.keys():
@@ -177,6 +186,8 @@ def filter(paf_files=[], bam_files=[], prefix=None, map_qual=30, iden_percent=0.
 							del file1[query]
 						else:
 							file1[query] = (segment1[0], max(start1, start2), min(end1, end2))
+				elif query in high_qual_querys:
+					file1.update({query:(segment[0], start1, end1)})
 	else:
 		file1 = files[0]
 	for i, bamfile in enumerate(bam_files):
@@ -242,7 +253,7 @@ def bamsnap(files=[], output_files=[], reference=None, region=None, regions_file
 		subprocess.run(f'bamsnap -bam {bam_argument} -title {title_arguments} -bed {regions_file} -margin 100 -out {directory}/{prefix} -save_image_only -ref {reference} -draw coordinates bamplot base -bamplot coverage read -read_color_by strand', shell=True, check=True)
 
 
-def preprocessing(files=[], directory='.', prefix='bamsnap', threads=1, map_qual=30, iden_percent=0.9, ovlp_percent=0.9, clip_percent=0.1, plot=False, reference=None, region=None, regions_file=None, force=False):
+def preprocessing(files=[], directory='.', prefix='bamsnap', threads=1, map_qual=30, mq_cutoff=50, iden_percent=0.9, ovlp_percent=0.9, clip_percent=0.1, plot=False, reference=None, region=None, regions_file=None, force=False):
 	if directory.endswith('/'):
 		directory = directory.split('/')[0]
 	if os.path.exists(directory):
@@ -269,15 +280,15 @@ def preprocessing(files=[], directory='.', prefix='bamsnap', threads=1, map_qual
 		if isinstance(prefix, str):
 			prefix = [prefix]
 		if len(prefix) == 1:
-			output_files_name = filter(paf_files, bam_files, None, map_qual, iden_percent, clip_percent, ovlp_percent, directory, force)
+			output_files_name = filter(paf_files, bam_files, None, map_qual, mq_cutoff, iden_percent, clip_percent, ovlp_percent, directory, force)
 		else:
-			output_files_name = filter(paf_files, bam_files, prefix[:-1], map_qual, iden_percent, clip_percent, ovlp_percent, directory, force)
+			output_files_name = filter(paf_files, bam_files, prefix[:-1], map_qual, mq_cutoff, iden_percent, clip_percent, ovlp_percent, directory, force)
 		bamsnap(bam_files, output_files_name, reference, region, regions_file, directory, prefix[-1], force)
 	else:
 		if isinstance(prefix, str):
-			output_files_name = filter(paf_files, bam_files, None, map_qual, iden_percent, clip_percent, ovlp_percent, directory, force)
+			output_files_name = filter(paf_files, bam_files, None, map_qual, mq_cutoff, iden_percent, clip_percent, ovlp_percent, directory, force)
 		else:
-			output_files_name = filter(paf_files, bam_files, prefix, map_qual, iden_percent, clip_percent, ovlp_percent, directory, force)
+			output_files_name = filter(paf_files, bam_files, prefix, map_qual, mq_cutoff, iden_percent, clip_percent, ovlp_percent, directory, force)
 
 
 if __name__=='__main__':
@@ -293,6 +304,7 @@ if __name__=='__main__':
 
 	group_fo = parser.add_argument_group("Filter Options")
 	group_fo.add_argument('-mq', '--map-qual', metavar='INT', type=int, help='Minium mapping quality for alignments [30]', default=30)
+	group_fo.add_argument('--mq-cutoff', metavar='INT', type=int, help='The cutoff of mapping quality for keeping the alignment [50]', default=50)
 	group_fo.add_argument('-ip', '--iden-percent', metavar='FLOAT', type=float, help='Minimum identity (num_match_res/len_aln) of the reads [0.9]', default=0.9)
 	group_fo.add_argument('-op', '--ovlp-percent', metavar='FLOAT', type=float, help='Minimum overlapping percentage of the reads if inputting more than one alignment files [0.9]', default=0.9)
 	group_fo.add_argument('-cp', '--clip-percent', metavar='FLOAT', type=float, help='Maximum clipped percentage of the reads [0.1]', default=0.1)
@@ -322,6 +334,11 @@ if __name__=='__main__':
 			print('ERROR!!! Please input at least one bam file\nPlease read the help message using "-h" or "--help"', file=sys.stderr)
 			raise SystemExit
 	
+	
+	if args['map_qual'] > args['mq_cutoff']:
+		print(f'WARNING!!! The minium mapping quality is {args["map_qual"]} and higher than the cutoff {args["mq_cutoff"]}, which means that wouldn\'t filter any reads\nPlease read the help message using "-h" or "--help"', file=sys.stdout)
+	
+
 	if isinstance(args['prefix'], str):
 		pass
 	elif len(args['prefix']) == 0:
