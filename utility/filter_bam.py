@@ -170,12 +170,13 @@ def filter(paf_files=[], bam_files=[], prefix=None, map_qual=30, mq_cutoff=50, i
 			files_sets.append(set(file.keys()))
 		comm_querys = set.intersection(*files_sets)
 
-		file1 = {query:segment for query, segment in files[0].items() if query in (high_qual_querys | comm_querys)}
+		final_querys = high_qual_querys | comm_querys
+		file1 = {query:segment for query, segment in files[0].items() if query in final_querys}
 		for file in files[1:]:
 			for query, segment in file.items():
 				if query in file1.keys():
 					segment1 = file1[query]
-					if segment[0] ==  segment1[0]:
+					if segment[0] == segment1[0]:
 						start1 = segment[1]
 						end1 = segment[2]
 						start2 = segment1[1]
@@ -186,8 +187,10 @@ def filter(paf_files=[], bam_files=[], prefix=None, map_qual=30, mq_cutoff=50, i
 							del file1[query]
 						else:
 							file1[query] = (segment1[0], max(start1, start2), min(end1, end2))
+					else:
+						del file1[query]
 				elif query in high_qual_querys:
-					file1.update({query:(segment[0], start1, end1)})
+					file1.update({query:(segment[0], segment[1], segment[2])})
 	else:
 		file1 = files[0]
 	for i, bamfile in enumerate(bam_files):
