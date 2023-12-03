@@ -164,12 +164,13 @@ def filter(paf_files=[], bam_files=[], prefix='GCI', map_qual=30, mq_cutoff=50, 
 			files_sets.append(set(file.keys()))
 		comm_querys = set.intersection(*files_sets)
 
-		file1 = {query:segment for query, segment in files[0].items() if query in (high_qual_querys | comm_querys)}
+		final_querys = high_qual_querys | comm_querys
+		file1 = {query:segment for query, segment in files[0].items() if query in final_querys}
 		for file in files[1:]:
 			for query, segment in file.items():
 				if query in file1.keys():
 					segment1 = file1[query]
-					if segment[0] ==  segment1[0]:
+					if segment[0] == segment1[0]:
 						start1 = segment[1]
 						end1 = segment[2]
 						start2 = segment1[1]
@@ -180,8 +181,10 @@ def filter(paf_files=[], bam_files=[], prefix='GCI', map_qual=30, mq_cutoff=50, 
 							del file1[query]
 						else:
 							file1[query] = (segment1[0], max(start1, start2), min(end1, end2))
+					else:
+						del file1[query]
 				elif query in high_qual_querys:
-					file1.update({query:(segment[0], start1, end1)})
+					file1.update({query:(segment[0], segment[1], segment[2])})
 	else:
 		file1 = files[0]
 	for segment in file1.values():
@@ -332,7 +335,7 @@ def complement_merged_depth(merged_depths_bed={}, targets_length={}, flank_len=1
 	return lengths_com_merged_depth
 
 
-def compute_index(targets_length={}, prefix='GCI', directory='.', force=False, merged_depths_bed_list=[], type_list=[], flank_len=15, dist_percent=0.001):
+def compute_index(targets_length={}, prefix='GCI', directory='.', force=False, merged_depths_bed_list=[], type_list=[], flank_len=15, dist_percent=0.005):
 	"""
 	usage: remove the regions with depth lower than the threshold and compute the index
 
@@ -549,7 +552,7 @@ def plot_depth(depths_list=[], depth_min=0.1, depth_max=10.0, window_size=0.001,
 		plt.close()
 
 
-def GCI(hifi=[], nano=[], directory='.', prefix='GCI', threads=1, map_qual=30, mq_cutoff=50, iden_percent=0.9, ovlp_percent=0.9, clip_percent=0.1, flank_len=15, threshold=0, plot=False, depth_min=0.1, depth_max=10.0, window_size=0.001, image_type='png', force=False, generate=False, dist_percent=0.001):
+def GCI(hifi=[], nano=[], directory='.', prefix='GCI', threads=1, map_qual=30, mq_cutoff=50, iden_percent=0.9, ovlp_percent=0.9, clip_percent=0.1, flank_len=15, threshold=0, plot=False, depth_min=0.1, depth_max=10.0, window_size=0.001, image_type='png', force=False, generate=False, dist_percent=0.005):
 	if directory.endswith('/'):
 		directory = directory.split('/')[0]
 	if os.path.exists(directory):
@@ -655,7 +658,7 @@ if __name__=='__main__':
 	group_io.add_argument('--hifi', nargs='+', metavar='', help='PacBio HiFi reads alignment files (at least one bam file)')
 	group_io.add_argument('--nano', nargs='+', metavar='', help='Oxford Nanopore long reads alignment files (at least one bam file)')
 	group_io.add_argument('-ts', '--threshold', metavar='INT', type=int, help='The threshold of depth in the final bed file [0]', default=0)
-	group_io.add_argument('-dp', '--dist-percent', metavar='FLOAT', type=float, help='The percentage of the distance between the candidate gap intervals in the whole chromosome (contig) [0.001]', default=0.001)
+	group_io.add_argument('-dp', '--dist-percent', metavar='FLOAT', type=float, help='The percentage of the distance between the candidate gap intervals in the whole chromosome (contig) [0.005]', default=0.005)
 	group_io.add_argument('-d', dest='directory', metavar='PATH', help='The directory of output files [.]', default='.')
 	group_io.add_argument('-o', '--output', dest='prefix', metavar='STR', help='Prefix of output files [GCI]', default='GCI')
 	group_io.add_argument('-t', '--threads', metavar='INT', type=int, help='Number of threads [1]', default=1)
