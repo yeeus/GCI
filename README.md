@@ -23,7 +23,6 @@ Genome Continuity Index (GCI) is a script to assess the assembly continuity for 
 For the complete pipeline, there are several necessary softwares:
 
 - [canu](https://github.com/marbl/canu) (for trio-binning)
-- [seqkit](https://github.com/shenwei356/seqkit) (for seq processing)
 - [minimap2](https://github.com/lh3/minimap2) (for mapping)
 - [winnowmap](https://github.com/marbl/Winnowmap) (for mapping)
 - [samtools](https://github.com/samtools/samtools) (for sam/bam processing)
@@ -106,10 +105,8 @@ canu -haplotype \
     useGrid=false
 
 # because there would be unknown reads which could't be reliably binned, we suggest to combine them with haplotype-specific reads
-seqkit shuffle -2 -o ${canu_unknown_shuffle.fa.gz} -j $threads ${canu_unknown.fa.gz}
-seqkit split2 ${canu_unknown_shuffle.fa.gz} -p 2 -j $threads
-cat ${canu_mat.fa.gz} ${canu_unknown_shuffle.part_001.fa.gz} > ${canu_mat.final.fa.gz}
-cat ${canu_pat.fa.gz} ${canu_unknown_shuffle.part_002.fa.gz} > ${canu_pat.final.fa.gz}
+cat ${canu_mat.fa.gz} ${canu_unknown.fa.gz} > ${canu_mat.final.fa.gz}
+cat ${canu_pat.fa.gz} ${canu_unknown.fa.gz} > ${canu_pat.final.fa.gz}
 ```
 
 2. Map HiFi and/or ONT reads to assemblies (using minimap2 and winnowmap)
@@ -167,11 +164,12 @@ python GCI.py --hifi hifi.bam hifi.paf (--nano ont.bam ont.paf) -d mat -o mat -t
 
 ### Benchmark
 We benchmarked GCI in many genomes:
-| Type of reads     | CHM13 | CN1 | HG002 | 
-| ------------------| ----- | --- | ----- |
-| HiFi (depth; GCI) | xxxxx | xxx | xxxxx |
-| Nano (depth; GCI) | xxxxx | xxx | xxxxx |
-| HiFi + Nano       | xxxxx | xxx | xxxxx |
+| Type of reads     |  CHM13.v.2.0 | CN1.mat.v0.9 | CN1.pat.v0.9 | HG002.mat.cur.20211005 | HG002.pat.cur.20211005 | GGswu | Col-CEN.v1.2 | MH63RS3 |
+| ------------------| -----------  | ------------ | ------------ | ---------------------- | ---------------------- | ----- | ------------ | ------- |
+| HiFi (depth; GCI) | ~58x; 41.83  | xxxxxxxxxxxx | xxxxxxxxxxxx | xxxxxxxxxxxxxxxxxxxxxx | xxxxxxxxxxxxxxxxxxxxxx | xxxxx | xxxxxxxxxxxx | xxxxxxx | 
+| Nano (depth; GCI) | ~134x; 87.04 | xxxxxxxxxxxx | xxxxxxxxxxxx | xxxxxxxxxxxxxxxxxxxxxx | xxxxxxxxxxxxxxxxxxxxxx | xxxxx | xxxxxxxxxxxx | xxxxxxx | 
+| depth of ONT-UL   | ~39x         | xxxxxxxxxxxx | xxxxxxxxxxxx | xxxxxxxxxxxxxxxxxxxxxx | xxxxxxxxxxxxxxxxxxxxxx | xxxxx | xxxxxxxxxxxx | xxxxxxx | 
+| HiFi + Nano       | 87.04        | xxxxxxxxxxxx | xxxxxxxxxxxx | xxxxxxxxxxxxxxxxxxxxxx | xxxxxxxxxxxxxxxxxxxxxx | xxxxx | xxxxxxxxxxxx | xxxxxxx | 
 
 ### Utility
 - filter_bam.py
