@@ -423,7 +423,7 @@ def compute_index(targets_length={}, prefix='GCI', directory='.', force=False, m
 				obs_n50 = obs_n50_dict[target]
 				exp_num_ctg = exp_num_ctg_dict[target]
 				obs_num_ctg = obs_num_ctg_dict[target]
-				f.write(f'{target}\t{exp_n50}\t{obs_n50}\t{exp_num_ctg}\t{obs_num_ctg}\t{100 * log2(obs_n50/exp_n50 + 1) / log2(obs_num_ctg/exp_num_ctg + 1)}\n')
+				f.write(f'{target}\t{exp_n50}\t{obs_n50}\t{exp_num_ctg}\t{obs_num_ctg}\t{100 * log2(obs_n50/exp_n50 + 1) / log2(obs_num_ctg/exp_num_ctg + 1):.4f}\n')
 			f.write('----------------------------------------------------------------------------------------------------------------------------------------\n\n\n')
 
 
@@ -751,3 +751,4 @@ if __name__=='__main__':
 		print(f'WARNING!!! The minium mapping quality is {args["map_qual"]} and higher than the cutoff {args["mq_cutoff"]}, which means that wouldn\'t filter any reads\nPlease read the help message using "-h" or "--help"', file=sys.stdout)
 
 	GCI(**args)
+	
