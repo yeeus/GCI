@@ -2,11 +2,12 @@ import sys
 import pysam
 import numpy as np
 import argparse
-import subprocess
 import os
 from math import log2
 import matplotlib.pyplot as plt
 import matplotlib.lines as mlines
+from matplotlib.ticker import AutoMinorLocator
+from matplotlib.ticker import ScalarFormatter
 
 
 def get_average_identity(alns):
@@ -345,7 +346,8 @@ def compute_n50(lengths=[]):
 
 	return: n50
 	"""
-
+	
+	lengths = sorted(lengths, reverse=True)
 	cum = np.cumsum(lengths)
 	for i, number in enumerate(cum):
 		if number >= cum[-1] / 2:
@@ -377,7 +379,7 @@ def compute_index(targets_length={}, prefix='GCI', directory='.', force=False, m
 		pass
 
 	
-	exp_lengths = sorted([length for length in targets_length.values()], reverse=True)
+	exp_lengths = [length for length in targets_length.values()]
 	exp_n50 = compute_n50(exp_lengths)
 	exp_num_ctg = len(exp_lengths)
 	exp_n50_dict = dict(targets_length)
@@ -388,7 +390,7 @@ def compute_index(targets_length={}, prefix='GCI', directory='.', force=False, m
 
 	for i, merged_depths_bed in enumerate(merged_depths_bed_list):
 		obs_lengths_dict = complement_merged_depth(merged_depths_bed, targets_length, flank_len)
-		obs_lengths = sorted([item for value in obs_lengths_dict.values() for item in value], reverse=True)
+		obs_lengths = [item for value in obs_lengths_dict.values() for item in value]
 		obs_n50 = compute_n50(obs_lengths)
 		obs_n50_dict = {target:compute_n50(lengths) for target, lengths in obs_lengths_dict.items()}
 		obs_n50_dict.update({'Genome':obs_n50})
@@ -469,7 +471,7 @@ def sliding_window_average_depth(depths=[], window_size=1, max_depth=None):
 	return averaged_positions, averaged_depths
 
 
-def plot_depth(depths_list=[], depth_min=0.1, depth_max=10.0, window_size=0.001, image_type='png', directory='.', prefix='GCI', force=False):
+def plot_depth(depths_list=[], depth_min=0.1, depth_max=4.0, window_size=0.001, image_type='png', directory='.', prefix='GCI', force=False):
 	"""
 	usage: plot whole genome depth
 
@@ -508,44 +510,71 @@ def plot_depth(depths_list=[], depth_min=0.1, depth_max=10.0, window_size=0.001,
 			sum_depths = np.concatenate((sum_depths, depths))
 		mean_depth2 = np.mean(sum_depths)
 
+	if len(depths_list) == 1:
+		max_depth = mean_depth * depth_max
+		averaged_dict = {}
+		max_averaged_depths = []
+		for target in depths_list[0].keys():
+			depths = depths_list[0][target]
+			averaged_positions, averaged_depths = sliding_window_average_depth(depths, max(1, round(len(depths) * window_size)), max_depth)
+			averaged_dict.update({target:(averaged_positions, averaged_depths)})
+			max_averaged_depths.append(max(averaged_depths))
+		y_high = max(max_averaged_depths) + 10
+	elif len(depths_list)  == 2:
+		depth_max1 = mean_depth1 * depth_max
+		depth_max2 = mean_depth2 * depth_max
+		averaged_dict1 = {}
+		averaged_dict2 = {}
+		max_averaged_depths1 = []
+		max_averaged_depths2 = []
+		for target in depths_list[0].keys():
+			depths1 = depths_list[0][target]
+			averaged_positions1, averaged_depths1 = sliding_window_average_depth(depths1, max(1, round(len(depths1) * window_size)), depth_max1)
+			averaged_dict1.update({target:(averaged_positions1, averaged_depths1)})
+			max_averaged_depths1.append(max(averaged_depths1))
+			depths2 = depths_list[-1][target]
+			averaged_positions2, averaged_depths2 = sliding_window_average_depth(depths2, max(1, round(len(depths2) * window_size)), depth_max2)
+			averaged_dict2.update({target:(averaged_positions2, averaged_depths2)})
+			max_averaged_depths2.append(max(averaged_depths2))
+		y_max = max(max_averaged_depths1) + 10
+		y_min = max(max_averaged_depths2) + 10
+
+
 	for target in depths_list[0].keys():
 		if len(depths_list) == 1:
-			fig, ax = plt.subplots(figsize=(20, 2.5))
+			fig, ax = plt.subplots(figsize=(20, 4))
 
 			depths = depths_list[0][target]
-			max_depth = mean_depth * depth_max
-			averaged_positions, averaged_depths = sliding_window_average_depth(depths, max(1, round(len(depths) * window_size)), max_depth)
-
+			averaged_positions, averaged_depths = averaged_dict[target]
 			ax.stackplot(averaged_positions, averaged_depths, lw=0.8, color='#2ca25f', zorder=4)
 			ax.axhline(mean_depth, color="r", ls='--', dash_capstyle='butt', lw=1, zorder=5)
 			
+			ax.set_ylim(top=y_high)
 			merged_min_bed = collapse_depth_range({target:depths}, 0, mean_depth * depth_min, 0)
 			for segment in merged_min_bed[target]:
 				ax.axvspan(segment[0], segment[1], facecolor='#B7DBEA')
 			merged_0_bed = collapse_depth_range({target:depths}, -1, 0, 0)
 			for segment in merged_0_bed[target]:
 				ax.axvspan(segment[0], segment[1], facecolor='#FAD7DD')
-		
+			
+			ax.xaxis.set_minor_locator(AutoMinorLocator())
+			ax.xaxis.set_minor_formatter(ScalarFormatter())
+			ax.yaxis.set_minor_locator(AutoMinorLocator())
+
 		elif len(depths_list)  == 2:
-			fig, ax = plt.subplots(figsize=(20, 5))
+			fig, ax = plt.subplots(figsize=(20, 8))
 
 			depths1 = depths_list[0][target]
-			depth_max1 = mean_depth1 * depth_max
-			averaged_positions1, averaged_depths1 = sliding_window_average_depth(depths1, max(1, round(len(depths1) * window_size)), depth_max1)
-
+			averaged_positions1, averaged_depths1 = averaged_dict1[target]
 			ax.stackplot(averaged_positions1, averaged_depths1, lw=0.8, color='#2ca25f', zorder=4)
 			ax.axhline(mean_depth1, color="r", ls='-.', dash_capstyle='butt', lw=1, zorder=5)
 			
 			ax.axhline(0, color="black")
 			depths2 = depths_list[-1][target]
-			depth_max2 = mean_depth2 * depth_max
-			averaged_positions2, averaged_depths2 = sliding_window_average_depth(depths2, max(1, round(len(depths2) * window_size)), depth_max2)
+			averaged_positions2, averaged_depths2 = averaged_dict2[target]
 			ax.stackplot(averaged_positions2, -np.array(averaged_depths2), lw=0.8, color='#3C5488', zorder=4)
 			ax.axhline(-mean_depth2, color="r", ls='-.', dash_capstyle='butt', lw=1, zorder=5)
 			
-
-			y_max = round(min(max(averaged_depths1), depth_max1) + 5)
-			y_min = round(min(max(averaged_depths2), depth_max2) + 5)
 			ax.set_ylim(bottom=-y_min, top=y_max)
 			y_frac = y_min / (y_max + y_min)
 			merged_min_bed = collapse_depth_range({target:depths1}, 0, mean_depth1 * depth_min, 0)
@@ -565,14 +594,17 @@ def plot_depth(depths_list=[], depth_min=0.1, depth_max=10.0, window_size=0.001,
 			nano_line = mlines.Line2D([], [], color='#3C5488', label='Nano', lw=0.8)
 			legend1 = plt.legend(handles=[hifi_line, nano_line], loc='upper left')
 			plt.gca().add_artist(legend1)
+			ax.xaxis.set_minor_locator(AutoMinorLocator())
+			ax.xaxis.set_minor_formatter(ScalarFormatter())
+			ax.yaxis.set_minor_locator(AutoMinorLocator())
 
 
 		merged_min_line = mlines.Line2D([], [], color='#B7DBEA', label=f'The region with the depth in the range of (0, {depth_min}*mean_depth]')
 		merged_0_line = mlines.Line2D([], [], color='#FAD7DD', label='The region of zero depth')
 		mean_line = mlines.Line2D([], [], color="r", ls='-.', dash_capstyle='butt', lw=1, label='Mean Coverage')
-		legend2 = plt.legend(handles=[mean_line, merged_min_line, merged_0_line], loc='upper right')
+		legend2 = plt.legend(handles=[mean_line, merged_min_line, merged_0_line], loc='lower center', bbox_to_anchor=(0.5, 1), ncols=3)
 		plt.gca().add_artist(legend2)
-		plt.title(f'Filtered depth across the whole genome:{target}', fontsize=18, pad=20)
+		plt.title(f'Filtered depth across the whole genome:{target}', fontsize=18, pad=30)
 		plt.xlabel('Genomic Position (bp)', fontsize=14)
 		plt.ylabel('Depth', fontsize=14)
 		plt.xticks(fontsize=12)
@@ -582,7 +614,7 @@ def plot_depth(depths_list=[], depth_min=0.1, depth_max=10.0, window_size=0.001,
 		plt.close()
 
 
-def GCI(hifi=[], nano=[], directory='.', prefix='GCI', threads=1, map_qual=30, mq_cutoff=50, iden_percent=0.9, ovlp_percent=0.9, clip_percent=0.1, flank_len=15, threshold=0, plot=False, depth_min=0.1, depth_max=10.0, window_size=0.001, image_type='png', force=False, generate=False, dist_percent=0.005):
+def GCI(hifi=[], nano=[], directory='.', prefix='GCI', threads=1, map_qual=30, mq_cutoff=50, iden_percent=0.9, ovlp_percent=0.9, clip_percent=0.1, flank_len=15, threshold=0, plot=False, depth_min=0.1, depth_max=4.0, window_size=0.001, image_type='png', force=False, generate=False, dist_percent=0.005):
 	if directory.endswith('/'):
 		directory = directory.split('/')[0]
 	if os.path.exists(directory):
@@ -704,7 +736,7 @@ if __name__=='__main__':
 	group_po = parser.add_argument_group("Plot Options")
 	group_po.add_argument('-p', '--plot', action='store_const', help='Visualize the finally filtered whole genome depth', const=True, default=False)
 	group_po.add_argument('-dmin', '--depth-min', metavar='FLOAT', type=float, help='Minimum depth in folds of mean coverage for plotting [0.1]', default=0.1)
-	group_po.add_argument('-dmax', '--depth-max', metavar='FLOAT', type=float, help='Maximum depth in folds of mean coverage for plotting [10.0]', default=10.0)
+	group_po.add_argument('-dmax', '--depth-max', metavar='FLOAT', type=float, help='Maximum depth in folds of mean coverage for plotting [4.0]', default=4.0)
 	group_po.add_argument('-ws', '--window-size', metavar='FLOAT', type=float, help='The window size in chromosome units (0-1) when plotting [0.001]', default=0.001)
 	group_po.add_argument('-it', '--image-type', metavar='STR', help='The format of the output images: png or pdf [png]', default='png')
 
