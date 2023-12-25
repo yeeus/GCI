@@ -33,7 +33,7 @@ As for **GCI**, it requires:
 - pysam (stable version)
 - numpy (stable version)
 - matplotlib (stable version)
-- [bamsnap](https://github.com/zy041225/bamsnap) (for plotting)
+- [bamsnap](https://github.com/yeeus/bamsnap) (for plotting)
 
 
 ### Parameters
@@ -75,7 +75,7 @@ Plot Options:
   -dmin FLOAT, --depth-min FLOAT
                         Minimum depth in folds of mean coverage for plotting [0.1]
   -dmax FLOAT, --depth-max FLOAT
-                        Maximum depth in folds of mean coverage for plotting [10.0]
+                        Maximum depth in folds of mean coverage for plotting [4.0]
   -ws FLOAT, --window-size FLOAT
                         The window size in chromosome units (0-1) when plotting [0.001]
   -it STR, --image-type STR
@@ -195,14 +195,9 @@ We benchmarked GCI in many genomes:
       
     - Example2
 
-      You can immediately visualize the alignments after getting the filtered file without using IGV. We provide a convenient method for visualizing via [bamsnap](https://github.com/zy041225/bamsnap).
+      You can immediately visualize the alignments after getting the filtered file without using IGV. We provide a convenient method for visualizing via [bamsnap](https://github.com/yeeus/bamsnap).
       ```
-      # first install bamsnap and the prerequisites
-      git clone https://github.com/zy041225/bamsnap.git
-      cd bamsnap
-      python setup.py install
-      pip install pillow==9.0
-
+      # first install the prerequisites and bamsnap
       # then you can visualize the alignments in one command
       python filter_bam.py test.bam test.paf -d test -o test -p -ref test.fasta -r chrxxx:xxx-xxx  ## Be cautious, in this case, the filtered file is `test.filter.bam`
       ```
