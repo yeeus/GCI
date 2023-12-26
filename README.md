@@ -27,7 +27,7 @@ For the complete pipeline, there are several necessary softwares:
 - [paftools.js](https://github.com/lh3/minimap2/blob/master/misc/paftools.js) (for converting sam to paf)
 
 As for **GCI**, it requires:
-- **python3.x** (written in python3.11.0 and tested in python3.10.8)
+- **python3.x** (tested in python3.10)
 - pysam (stable version)
 - numpy (stable version)
 - matplotlib (stable version)
