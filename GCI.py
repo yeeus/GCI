@@ -709,10 +709,10 @@ def GCI(hifi=[], nano=[], directory='.', prefix='GCI', threads=1, map_qual=30, m
 
 if __name__=='__main__':
 	###########################
-	### version = 1.0
+	### version = 0.1
 	### this version have some limits: -t
 	###########################
-	version = 'GCI version 1.0'
+	version = 'GCI version 0.1'
 
 	parser = argparse.ArgumentParser(prog=sys.argv[0], add_help=False, formatter_class=argparse.RawDescriptionHelpFormatter, description='A program for assessing the T2T genome', epilog='Examples:\npython GCI.py --hifi hifi.bam hifi.paf ... --nano nano.bam nano.paf ...')
 
@@ -723,7 +723,7 @@ if __name__=='__main__':
 	group_io.add_argument('-dp', '--dist-percent', metavar='FLOAT', type=float, help='The percentage of the distance between the candidate gap intervals in the whole chromosome (contig) [0.005]', default=0.005)
 	group_io.add_argument('-d', dest='directory', metavar='PATH', help='The directory of output files [.]', default='.')
 	group_io.add_argument('-o', '--output', dest='prefix', metavar='STR', help='Prefix of output files [GCI]', default='GCI')
-	group_io.add_argument('-t', '--threads', metavar='INT', type=int, help='Number of threads [1]', default=1)
+	#group_io.add_argument('-t', '--threads', metavar='INT', type=int, help='Number of threads [1]', default=1)
 
 	group_fo = parser.add_argument_group("Filter Options")
 	group_fo.add_argument('-mq', '--map-qual', metavar='INT', type=int, help='Minium mapping quality for alignments [30]', default=30)
