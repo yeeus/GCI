@@ -132,7 +132,7 @@ We recommend to input only one alignment file per software (minimap2 and winnowm
 ```
 # Before this, make sure you've generated the index file (.bai) for bam files
 # we recommend to input one bam and one paf file produced by two softwares (for example, one bam file from winnowmap and one paf file from minimap2)
-python GCI.py --hifi hifi.bam hifi.paf (--nano ont.bam ont.paf) -d mat -o mat -t -p ...
+python GCI.py --hifi hifi.bam hifi.paf --nano ont.bam ont.paf -d mat -o mat -t -p ...
 ```
 
 ### Outputs
