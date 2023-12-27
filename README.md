@@ -132,7 +132,7 @@ We recommend to input only one alignment file per software (minimap2 and winnowm
 ```
 # Before this, make sure you've generated the index file (.bai) for bam files
 # we recommend to input one bam and one paf file produced by two softwares (for example, one bam file from winnowmap and one paf file from minimap2)
-python GCI.py --hifi hifi.bam hifi.paf --nano ont.bam ont.paf -d mat -o mat -t -p ...
+python GCI.py --hifi hifi.bam hifi.paf --nano ont.bam ont.paf -d mat -o mat -p ...
 ```
 
 ### Outputs
@@ -165,6 +165,7 @@ We benchmarked GCI in many genomes:
 | HiFi (depth; GCI)            | ~58x; 41.8259  | ~44x; 22.8391 | ~44x; 22.4743 | ~83x; 7.9651           | ~83x; 14.9464          | ~51x; 7.9901   | ~90x; 30.7545  | ~39x; 49.8945 | 
 | Nano (depth; GCI)            | ~134x; 87.0425 | ~39x; 51.5398 | ~39x; 63.0391 | ~257x; 34.9807         | ~257x; 35.4896         | ~103x; 30.5893 | ~480x; 99.9999 |               | 
 | HiFi + Nano                  | 87.0425        | 66.7940       | 77.8956       | 36.6257                | 41.6960                | 29.5146        | 99.9999        |               | 
+Note: all the results are computed using one bam file from winnowmap and one paf file from minimap2
 
 ### Utility
 - filter_bam.py
