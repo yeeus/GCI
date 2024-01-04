@@ -18,7 +18,7 @@ def get_average_identity(alns):
 
 	return: the average identity
 	"""
-
+	###! just average without weights
 	tmp = []
 	for a in alns:
 		tmp.append(a[-1])
@@ -346,7 +346,7 @@ def compute_n50(lengths=[]):
 
 	return: n50
 	"""
-	
+	n50 = 0
 	lengths = sorted(lengths, reverse=True)
 	cum = np.cumsum(lengths)
 	for i, number in enumerate(cum):
