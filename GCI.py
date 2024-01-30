@@ -425,7 +425,12 @@ def compute_index(targets_length={}, prefix='GCI', directory='.', force=False, m
 				obs_n50 = obs_n50_dict[target]
 				exp_num_ctg = exp_num_ctg_dict[target]
 				obs_num_ctg = obs_num_ctg_dict[target]
-				f.write(f'{target}\t{exp_n50}\t{obs_n50}\t{exp_num_ctg}\t{obs_num_ctg}\t{100 * log2(obs_n50/exp_n50 + 1) / log2(obs_num_ctg/exp_num_ctg + 1):.4f}\n')
+				
+				if obs_num_ctg == 0:
+					gci = 0
+				else:
+					gci = 100 * log2(obs_n50/exp_n50 + 1) / log2(obs_num_ctg/exp_num_ctg + 1)
+				f.write(f'{target}\t{exp_n50}\t{obs_n50}\t{exp_num_ctg}\t{obs_num_ctg}\t{gci:.4f}\n')
 			f.write('----------------------------------------------------------------------------------------------------------------------------------------\n\n\n')
 
 
