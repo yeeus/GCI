@@ -303,7 +303,7 @@ if __name__=='__main__':
 	group_io.add_argument('files', nargs='+', metavar='ALIGNMENT-FILE', help='Long reads alignment files (at least one bam file)')
 	group_io.add_argument('-d', dest='directory', metavar='PATH', help='The directory of output files [.]', default='.')
 	group_io.add_argument('-o', '--output', nargs='*', dest='prefix', metavar='STR', help='Prefix of output files; one prefix corresponds to one bam file in order and if provide the parameter "-p", the last one is used as the prefix for bamsnap outputs (output directory if inputting the regions file) [[$input.filter] for filtered bam files and [bamsnap] for bamsnap outputs]', default='bamsnap')
-	group_io.add_argument('-t', '--threads', metavar='INT', type=int, help='Number of threads [1]', default=1)
+	#group_io.add_argument('-t', '--threads', metavar='INT', type=int, help='Number of threads [1]', default=1)
 
 	group_fo = parser.add_argument_group("Filter Options")
 	group_fo.add_argument('-mq', '--map-qual', metavar='INT', type=int, help='Minium mapping quality for alignments [30]', default=30)
