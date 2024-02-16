@@ -235,7 +235,7 @@ def filter(paf_files=[], bam_files=[], prefix='GCI', map_qual=30, mq_cutoff=50, 
 			for target, depth_list in depths.items():
 				f.write(f'>{target}\n')
 				for i, depth in enumerate(depth_list):
-					f.write(f'{i}\t{depth}\n')
+					f.write(f'{depth}\n')
 	
 	return depths, targets_length
 
