@@ -271,7 +271,7 @@ def merge_two_type_depth(hifi_depths={}, nano_depths={}, prefix='GCI', directory
 			for target, depth_list in merged_two_type_depths.items():
 				f.write(f'>{target}\n')
 				for i, depth in enumerate(depth_list):
-					f.write(f'{i}\t{depth}\n')
+					f.write(f'{depth}\n')
 
 	return merged_two_type_depths
 
