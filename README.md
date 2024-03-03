@@ -152,7 +152,7 @@ python GCI.py -r ref.fa --hifi hifi.bam hifi.paf --nano ont.bam ont.paf -d mat -
       > ![https://github.com/yeeus/GCI/images/MH63.chr01.png](https://github.com/yeeus/GCI/blob/main/images/MH63.chr01.png)
 
       - (${prefix}.${target}:${start}-${end}.${image_type}) (if providing the parameter **-R**)
-      > ![https://github.com/yeeus/GCI/images/MH63.Chr02_MH63_13000000-15000000.pdf](https://github.com/yeeus/GCI/blob/main/images/MH63.Chr02_MH63_13000000-15000000.pdf)
+      > ![https://github.com/yeeus/GCI/images/MH63.Chr02_MH63_13000000-15000000.png](https://github.com/yeeus/GCI/blob/main/images/MH63.Chr02_MH63_13000000-15000000.png)
   
 #### providing two types
 - ${dictionay}/
@@ -172,7 +172,7 @@ python GCI.py -r ref.fa --hifi hifi.bam hifi.paf --nano ont.bam ont.paf -d mat -
     > ![https://github.com/yeeus/GCI/images/chm13.chr19.png](https://github.com/yeeus/GCI/blob/main/images/chm13.chr19.png)
 
     - (${prefix}.${target}:${start}-${end}.${image_type})
-    > ![https://github.com/yeeus/GCI/images/arabidopsis.Chr2_0-500000.pdf](https://github.com/yeeus/GCI/blob/main/images/arabidopsis.Chr2_0-500000.pdf)
+    > ![https://github.com/yeeus/GCI/images/arabidopsis.Chr2_0-500000.png](https://github.com/yeeus/GCI/blob/main/images/arabidopsis.Chr2_0-500000.png)
 
 
 ### Benchmark
