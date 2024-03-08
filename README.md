@@ -39,7 +39,7 @@ As for **GCI**, it requires:
 python GCI.py --help
 
 usage: GCI.py [-r FILE] [--hifi  [...]] [--nano  [...]] [-ts INT] [-dp FLOAT] [-d PATH] [-o STR] [-mq INT] [--mq-cutoff INT] [-ip FLOAT] [-op FLOAT]
-              [-cp FLOAT] [-fl INT] [-p] [-R FILE] [-dmin FLOAT] [-dmax FLOAT] [-ws FLOAT] [-it STR] [-f] [-h] [-v]
+              [-cp FLOAT] [-fl INT] [-p] [-R FILE] [-dmin FLOAT] [-dmax FLOAT] [-ws INT] [-it STR] [-f] [-h] [-v]
 
 A program for assessing the T2T genome
 
@@ -76,8 +76,8 @@ Plot Options:
                         Minimum depth in folds of mean coverage for plotting [0.1]
   -dmax FLOAT, --depth-max FLOAT
                         Maximum depth in folds of mean coverage for plotting [4.0]
-  -ws FLOAT, --window-size FLOAT
-                        The window size in chromosome units (0-1) when plotting [0.001]
+  -ws INT, --window-size INT
+                        The window size when plotting [50000]
   -it STR, --image-type STR
                         The format of the output images: png or pdf [png]
 
