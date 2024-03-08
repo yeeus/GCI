@@ -32,8 +32,7 @@ def get_Ns_ref(reference=None, prefix='GCI', directory='.', force=False):
     
     if len(Ns_bed) != 0:
         if os.path.exists(f'{directory}/{prefix}.gaps.bed') and force == False:
-            print(f'ERROR!!! The file "{directory}/{prefix}.gaps.bed" exists\nPlease using "-f" or "--force" to rewrite', file=sys.stderr)
-            raise SystemExit
+            sys.exit(f'ERROR!!! The file "{directory}/{prefix}.gaps.bed" exists\nPlease using "-f" or "--force" to rewrite')
         with open(f'{directory}/{prefix}.gaps.bed', 'w') as f:
             for target, segments in Ns_bed.items():
                 for segment in segments:
@@ -108,7 +107,7 @@ def collapse_depth_range(depths={}, leftmost=-1, rightmost=0, flank_len=15, star
     return merged_depths_bed
 
 
-def sliding_window_average_depth(depths=[], window_size=1, max_depth=None, start=0):
+def sliding_window_average_depth(depths=[], window_size=50000, max_depth=None, start=0):
     """
     usage: get the averaged depths via sliding window
 
@@ -122,6 +121,9 @@ def sliding_window_average_depth(depths=[], window_size=1, max_depth=None, start
     averaged_positions = []
     averaged_depths = []
     window_depths = []
+    if len(depths) < window_size:
+        sys.exit(f'The length of plotting region ({len(depths)}) is less than the window size ({window_size})')
+        
     for i, depth in enumerate(depths):
         if depth == 0:
             if len(window_depths) > 0:
@@ -186,7 +188,7 @@ def merge_merged_depth_bed(merged_depths_bed={}, targets_length={}, dist_percent
     return new_merged_depths_bed
 
 
-def pre_plot_base(depths_list=[], max_depths=[], window_size=0.001, start=0):
+def pre_plot_base(depths_list=[], max_depths=[], window_size=50000, start=0):
     """
     usage: get some prerequisite objects
 
@@ -206,7 +208,7 @@ def pre_plot_base(depths_list=[], max_depths=[], window_size=0.001, start=0):
     for target in depths_list[0].keys():
         for i, depthss in enumerate(depths_list):
             depths = depthss[target]
-            averaged_positions, averaged_depths = sliding_window_average_depth(depths, max(1, round(len(depths) * window_size)), max_depths[i], start)
+            averaged_positions, averaged_depths = sliding_window_average_depth(depths, window_size, max_depths[i], start)
             averaged_dicts[i].update({target:(averaged_positions, averaged_depths)})
             max_averaged_depths_list[i].append(max(averaged_depths))
 
@@ -283,7 +285,6 @@ def plot_base(depths_list=[], target=None, averaged_dicts=[], mean_depths=[], y_
 
     ax.set_ylim(bottom=-y_min, top=y_max)
     ax.xaxis.set_minor_locator(AutoMinorLocator())
-    ax.xaxis.set_minor_formatter(ScalarFormatter())
     ax.yaxis.set_minor_locator(AutoMinorLocator())
     
     lines = []
@@ -315,7 +316,7 @@ def plot_base(depths_list=[], target=None, averaged_dicts=[], mean_depths=[], y_
     plt.close()
 
     
-def plot_depth(depths_list=[], depth_min=0.1, depth_max=4.0, window_size=0.001, image_type='png', directory='.', prefix='GCI', force=False, Ns_bed=None, targets_length={}, dist_percent=0.005, regions=None):
+def plot_depth(depths_list=[], depth_min=0.1, depth_max=4.0, window_size=50000, image_type='png', directory='.', prefix='GCI', force=False, Ns_bed=None, targets_length={}, dist_percent=0.005, regions=None):
     """
     usage: plot whole genome depth
 
@@ -337,11 +338,9 @@ def plot_depth(depths_list=[], depth_min=0.1, depth_max=4.0, window_size=0.001, 
     if image_type == 'pdf' or image_type == 'png':
         for target in depths_list[0].keys():
             if os.path.exists(f'{directory}/{prefix}.{target}.{image_type}') and force == False:
-                print(f'ERROR!!! The file "{directory}/{prefix}.{target}.{image_type}" exists\nPlease use "-f" or "--force" to rewrite', file=sys.stderr)
-                raise SystemExit
+                sys.exit(f'ERROR!!! The file "{directory}/{prefix}.{target}.{image_type}" exists\nPlease use "-f" or "--force" to rewrite')
     else:
-        print(f'ERROR!!! The format of output images only supports pdf and png', file=sys.stderr)
-        raise SystemExit
+        sys.exit(f'ERROR!!! The format of output images only supports pdf and png')
     
     if Ns_bed != None:
         for target, segments in Ns_bed.items():
@@ -370,8 +369,7 @@ def plot_depth(depths_list=[], depth_min=0.1, depth_max=4.0, window_size=0.001, 
                     start = int(start)
                     end = int(end)
                     if os.path.exists(f'{directory}/{prefix}.{target}:{start}-{end}.{image_type}') and force == False:
-                        print(f'ERROR!!! The file "{directory}/{prefix}.{target}:{start}-{end}.{image_type}" exists\nPlease use "-f" or "--force" to rewrite', file=sys.stderr)
-                        raise SystemExit
+                        sys.exit(f'ERROR!!! The file "{directory}/{prefix}.{target}:{start}-{end}.{image_type}" exists\nPlease use "-f" or "--force" to rewrite')
                     
                     regions_depths_list = []
                     for depthss in depths_list:
@@ -380,27 +378,23 @@ def plot_depth(depths_list=[], depth_min=0.1, depth_max=4.0, window_size=0.001, 
                     averaged_dicts, y_frac, y_min, y_max = pre_plot_base(regions_depths_list, max_depths, window_size, start)
                     plot_base(regions_depths_list, target, averaged_dicts, mean_depths, y_frac, start, depth_min, dist_percent, y_min, y_max, image_type, directory, prefix, end, True)
         else:
-            print(f'ERROR!!! "{regions}" is not an available file', file=sys.stderr)
-            raise SystemExit
+            sys.exit(f'ERROR!!! "{regions}" is not an available file')
 
 
-def preprocessing(reference=None, hifi=None, nano=None, directory='.', prefix='GCI', depth_min=0.1, depth_max=4.0, window_size=0.001, image_type='png', force=False, regions=None, dist_percent=0.005):
+def preprocessing(reference=None, hifi=None, nano=None, directory='.', prefix='GCI', depth_min=0.1, depth_max=4.0, window_size=50000, image_type='png', force=False, regions=None, dist_percent=0.005):
     if directory.endswith('/'):
         directory = directory.split('/')[0]
     if os.path.exists(directory):
         if not os.access(directory, os.R_OK):
-            print(f'ERROR!!! The path "{directory}" is unable to read', file=sys.stderr)
-            raise SystemExit
+            sys.exit(f'ERROR!!! The path "{directory}" is unable to read')
         if not os.access(directory, os.W_OK):
-            print(f'ERROR!!! The path "{directory}" is unable to write', file=sys.stderr)
-            raise SystemExit
+            sys.exit(f'ERROR!!! The path "{directory}" is unable to write')
     else:
         os.makedirs(directory)
 
 
     if prefix.endswith('/'):
-        print(f'ERROR!!! The prefix "{prefix}" is not allowed', file=sys.stderr)
-        raise SystemExit
+        sys.exit(f'ERROR!!! The prefix "{prefix}" is not allowed')
     
     image_type = image_type.lower()
 
@@ -431,7 +425,7 @@ if __name__=='__main__':
     group_po.add_argument('-R', '--regions', metavar='FILE', help='Bed file contains regions to plot')
     group_po.add_argument('-dmin', '--depth-min', metavar='FLOAT', type=float, help='Minimum depth in folds of mean coverage for plotting [0.1]', default=0.1)
     group_po.add_argument('-dmax', '--depth-max', metavar='FLOAT', type=float, help='Maximum depth in folds of mean coverage for plotting [4.0]', default=4.0)
-    group_po.add_argument('-ws', '--window-size', metavar='FLOAT', type=float, help='The window size in chromosome units (0-1) when plotting [0.001]', default=0.001)
+    group_po.add_argument('-ws', '--window-size', metavar='INT', type=int, help='The window size when plotting [50000]', default=50000)
     group_po.add_argument('-it', '--image-type', metavar='STR', help='The format of the output images: png or pdf [png]', default='png')
 
 
@@ -443,31 +437,26 @@ if __name__=='__main__':
     print(f'Used arguments:{args}')
 
     if (args['hifi'] == None) and (args['nano'] == None):
-        print('ERROR!!! Please input at least one depth file\nPlease read the help message using "-h" or "--help"', file=sys.stderr)
-        raise SystemExit
+        sys.exit('ERROR!!! Please input at least one depth file\nPlease read the help message using "-h" or "--help"')
     
     if (args['hifi'] != None):
         if os.path.exists(args['hifi']) and os.access(args['hifi'], os.R_OK):
             pass
         else:
-            print(f'ERROR!!! \"{args["hifi"]}\" is not an available file', file=sys.stderr)
-            raise SystemExit
+            sys.exit(f'ERROR!!! \"{args["hifi"]}\" is not an available file')
     if (args['nano'] != None):
         if os.path.exists(args['nano']) and os.access(args['nano'], os.R_OK):
             pass
         else:
-            print(f'ERROR!!! \"{args["nano"]}\" is not an available file', file=sys.stderr)
-            raise SystemExit
+            sys.exit(f'ERROR!!! \"{args["nano"]}\" is not an available file')
     
 
     if args['reference'] == None:
-        print('ERROR!!! Please input the reference file\nPlease read the help message using "-h" or "--help"', file=sys.stderr)
-        raise SystemExit
+        sys.exit('ERROR!!! Please input the reference file\nPlease read the help message using "-h" or "--help"')
     else:
         if os.path.exists(args['reference']) and os.access(args['reference'], os.R_OK):
             pass
         else:
-            print(f'ERROR!!! \"{args["reference"]}\" is not an available file', file=sys.stderr)
-            raise SystemExit
+            sys.exit(f'ERROR!!! \"{args["reference"]}\" is not an available file')
     
     preprocessing(**args)
