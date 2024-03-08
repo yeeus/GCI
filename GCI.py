@@ -35,8 +35,7 @@ def get_Ns_ref(reference=None, prefix='GCI', directory='.', force=False):
     
     if len(Ns_bed) != 0:
         if os.path.exists(f'{directory}/{prefix}.gaps.bed') and force == False:
-            print(f'ERROR!!! The file "{directory}/{prefix}.gaps.bed" exists\nPlease use "-f" or "--force" to rewrite', file=sys.stderr)
-            raise SystemExit
+            sys.exit(f'ERROR!!! The file "{directory}/{prefix}.gaps.bed" exists\nPlease use "-f" or "--force" to rewrite')
         with open(f'{directory}/{prefix}.gaps.bed', 'w') as f:
             for target, segments in Ns_bed.items():
                 for segment in segments:
@@ -123,8 +122,7 @@ def filter(paf_files=[], bam_files=[], prefix='GCI', map_qual=30, mq_cutoff=50, 
     """
     
     if os.path.exists(f'{directory}/{prefix}.depth.gz') and force == False:
-        print(f'ERROR!!! The file "{directory}/{prefix}.depth.gz" exists\nPlease use "-f" or "--force" to rewrite', file=sys.stderr)
-        raise SystemExit
+        sys.exit(f'ERROR!!! The file "{directory}/{prefix}.depth.gz" exists\nPlease use "-f" or "--force" to rewrite')
     
     high_qual_querys = set()
     paf_lines = [{} for i in range(len(paf_files))]
@@ -255,8 +253,7 @@ def merge_two_type_depth(hifi_depths={}, nano_depths={}, prefix='GCI', directory
     """
 
     if os.path.exists(f'{directory}/{prefix}.depth.gz') and force == False:
-        print(f'ERROR!!! The file "{directory}/{prefix}.depth.gz" exists\nPlease use "-f" or "--force" to rewrite', file=sys.stderr)
-        raise SystemExit
+        sys.exit(f'ERROR!!! The file "{directory}/{prefix}.depth.gz" exists\nPlease use "-f" or "--force" to rewrite')
 
 
     merged_two_type_depths = {target:[] for target in hifi_depths.keys()}
@@ -330,8 +327,7 @@ def merge_depth(depths={}, prefix='GCI', threshold=0, flank_len=15, directory='.
     return: the dictionary containing the merged depth bed file (with Ns or not)
     """
     if os.path.exists(f'{directory}/{prefix}.{threshold}.depth.bed') and force == False:
-        print(f'ERROR!!! The file "{directory}/{prefix}.{threshold}.depth.bed" exists\nPlease use "-f" or "--force" to rewrite', file=sys.stderr)
-        raise SystemExit
+        sys.exit(f'ERROR!!! The file "{directory}/{prefix}.{threshold}.depth.bed" exists\nPlease use "-f" or "--force" to rewrite')
     
     merged_depths_bed = collapse_depth_range(depths, -1, threshold, flank_len)
     with open(f'{directory}/{prefix}.{threshold}.depth.bed', 'w') as f:
@@ -342,8 +338,7 @@ def merge_depth(depths={}, prefix='GCI', threshold=0, flank_len=15, directory='.
 
     if Ns_bed_file != None:
         if os.path.exists(f'{directory}/{prefix}.final.bed') and force == False:
-            print(f'ERROR!!! The file "{directory}/{prefix}.final.bed" exists\nPlease use "-f" or "--force" to rewrite', file=sys.stderr)
-            raise SystemExit
+            sys.exit(f'ERROR!!! The file "{directory}/{prefix}.final.bed" exists\nPlease use "-f" or "--force" to rewrite')
         subprocess.run(f'cat {directory}/{prefix}.{threshold}.depth.bed {Ns_bed_file} | sort -k1,1V -k2,2n | bedtools merge -i - > {directory}/{prefix}.final.bed', shell=True, check=True)
 
         merged_depths_bed_last = {target:[] for target in depths.keys()}
@@ -460,8 +455,7 @@ def compute_index(targets_length={}, prefix='GCI', directory='.', force=False, m
     """
 
     if os.path.exists(f'{directory}/{prefix}.gci') and force == False:
-        print(f'ERROR!!! The file "{directory}/{prefix}.gci" exists\nPlease use "-f" or "--force" to rewrite', file=sys.stderr)
-        raise SystemExit
+        sys.exit(f'ERROR!!! The file "{directory}/{prefix}.gci" exists\nPlease use "-f" or "--force" to rewrite')
     with open(f'{directory}/{prefix}.gci', 'w') as f:
         pass
 
@@ -508,7 +502,7 @@ def compute_index(targets_length={}, prefix='GCI', directory='.', force=False, m
             f.write('----------------------------------------------------------------------------------------------------------------------------------------\n\n\n')
 
 
-def sliding_window_average_depth(depths=[], window_size=1, max_depth=None, start=0):
+def sliding_window_average_depth(depths=[], window_size=50000, max_depth=None, start=0):
     """
     usage: get the averaged depths via sliding window
 
@@ -522,6 +516,9 @@ def sliding_window_average_depth(depths=[], window_size=1, max_depth=None, start
     averaged_positions = []
     averaged_depths = []
     window_depths = []
+    if len(depths) < window_size:
+        sys.exit(f'The length of plotting region ({len(depths)}) is less than the window size ({window_size})')
+    
     for i, depth in enumerate(depths):
         if depth == 0:
             if len(window_depths) > 0:
@@ -551,7 +548,7 @@ def sliding_window_average_depth(depths=[], window_size=1, max_depth=None, start
     return averaged_positions, np.array(averaged_depths)
 
 
-def pre_plot_base(depths_list=[], max_depths=[], window_size=0.001, start=0):
+def pre_plot_base(depths_list=[], max_depths=[], window_size=50000, start=0):
     """
     usage: get some prerequisite objects
 
@@ -571,7 +568,7 @@ def pre_plot_base(depths_list=[], max_depths=[], window_size=0.001, start=0):
     for target in depths_list[0].keys():
         for i, depthss in enumerate(depths_list):
             depths = depthss[target]
-            averaged_positions, averaged_depths = sliding_window_average_depth(depths, max(1, round(len(depths) * window_size)), max_depths[i], start)
+            averaged_positions, averaged_depths = sliding_window_average_depth(depths, window_size, max_depths[i], start)
             averaged_dicts[i].update({target:(averaged_positions, averaged_depths)})
             max_averaged_depths_list[i].append(max(averaged_depths))
 
@@ -648,7 +645,6 @@ def plot_base(depths_list=[], target=None, averaged_dicts=[], mean_depths=[], y_
 
     ax.set_ylim(bottom=-y_min, top=y_max)
     ax.xaxis.set_minor_locator(AutoMinorLocator())
-    ax.xaxis.set_minor_formatter(ScalarFormatter())
     ax.yaxis.set_minor_locator(AutoMinorLocator())
     
     lines = []
@@ -680,7 +676,7 @@ def plot_base(depths_list=[], target=None, averaged_dicts=[], mean_depths=[], y_
     plt.close()
 
 
-def plot_depth(depths_list=[], depth_min=0.1, depth_max=4.0, window_size=0.001, image_type='png', directory='.', prefix='GCI', force=False, Ns_bed=None, targets_length={}, dist_percent=0.005, regions=None):
+def plot_depth(depths_list=[], depth_min=0.1, depth_max=4.0, window_size=50000, image_type='png', directory='.', prefix='GCI', force=False, Ns_bed=None, targets_length={}, dist_percent=0.005, regions=None):
     """
     usage: plot whole genome depth
 
@@ -702,11 +698,9 @@ def plot_depth(depths_list=[], depth_min=0.1, depth_max=4.0, window_size=0.001, 
     if image_type == 'pdf' or image_type == 'png':
         for target in depths_list[0].keys():
             if os.path.exists(f'{directory}/images/{prefix}.{target}.{image_type}') and force == False:
-                print(f'ERROR!!! The file "{directory}/images/{prefix}.{target}.{image_type}" exists\nPlease use "-f" or "--force" to rewrite', file=sys.stderr)
-                raise SystemExit
+                sys.exit(f'ERROR!!! The file "{directory}/images/{prefix}.{target}.{image_type}" exists\nPlease use "-f" or "--force" to rewrite')
     else:
-        print(f'ERROR!!! The format of output images only supports pdf and png', file=sys.stderr)
-        raise SystemExit
+        sys.exit(f'ERROR!!! The format of output images only supports pdf and png')
     
     if Ns_bed != None:
         for target, segments in Ns_bed.items():
@@ -735,8 +729,7 @@ def plot_depth(depths_list=[], depth_min=0.1, depth_max=4.0, window_size=0.001, 
                     start = int(start)
                     end = int(end)
                     if os.path.exists(f'{directory}/images/{prefix}.{target}:{start}-{end}.{image_type}') and force == False:
-                        print(f'ERROR!!! The file "{directory}/images/{prefix}.{target}:{start}-{end}.{image_type}" exists\nPlease use "-f" or "--force" to rewrite', file=sys.stderr)
-                        raise SystemExit
+                        sys.exit(f'ERROR!!! The file "{directory}/images/{prefix}.{target}:{start}-{end}.{image_type}" exists\nPlease use "-f" or "--force" to rewrite')
                     
                     regions_depths_list = []
                     for depthss in depths_list:
@@ -745,35 +738,29 @@ def plot_depth(depths_list=[], depth_min=0.1, depth_max=4.0, window_size=0.001, 
                     averaged_dicts, y_frac, y_min, y_max = pre_plot_base(regions_depths_list, max_depths, window_size, start)
                     plot_base(regions_depths_list, target, averaged_dicts, mean_depths, y_frac, start, depth_min, dist_percent, y_min, y_max, image_type, directory, prefix, end, True)
         else:
-            print(f'ERROR!!! "{regions}" is not an available file', file=sys.stderr)
-            raise SystemExit
+            sys.exit(f'ERROR!!! "{regions}" is not an available file')
 
 
-def GCI(hifi=[], nano=[], directory='.', prefix='GCI', threads=1, map_qual=30, mq_cutoff=50, iden_percent=0.9, ovlp_percent=0.9, clip_percent=0.1, flank_len=15, threshold=0, plot=False, depth_min=0.1, depth_max=4.0, window_size=0.001, image_type='png', force=False, dist_percent=0.005, reference=None, regions=None):
+def GCI(hifi=[], nano=[], directory='.', prefix='GCI', threads=1, map_qual=30, mq_cutoff=50, iden_percent=0.9, ovlp_percent=0.9, clip_percent=0.1, flank_len=15, threshold=0, plot=False, depth_min=0.1, depth_max=4.0, window_size=50000, image_type='png', force=False, dist_percent=0.005, reference=None, regions=None):
     if directory.endswith('/'):
         directory = directory.split('/')[0]
     if os.path.exists(directory):
         if not os.access(directory, os.R_OK):
-            print(f'ERROR!!! The path "{directory}" is unable to read', file=sys.stderr)
-            raise SystemExit
+            sys.exit(f'ERROR!!! The path "{directory}" is unable to read')
         if not os.access(directory, os.W_OK):
-            print(f'ERROR!!! The path "{directory}" is unable to write', file=sys.stderr)
-            raise SystemExit
+            sys.exit(f'ERROR!!! The path "{directory}" is unable to write')
     else:
         os.makedirs(directory)
 
     if prefix.endswith('/'):
-        print(f'ERROR!!! The prefix "{prefix}" is not allowed', file=sys.stderr)
-        raise SystemExit
+        sys.exit(f'ERROR!!! The prefix "{prefix}" is not allowed')
     
     if plot == True:
         if os.path.exists(f'{directory}/images'):
             if not os.access(f'{directory}/images', os.R_OK):
-                print(f'ERROR!!! The path "{directory}/images" is unable to read', file=sys.stderr)
-                raise SystemExit
+                sys.exit(f'ERROR!!! The path "{directory}/images" is unable to read')
             if not os.access(f'{directory}/images', os.W_OK):
-                print(f'ERROR!!! The path "{directory}/images" is unable to write', file=sys.stderr)
-                raise SystemExit
+                sys.exit(f'ERROR!!! The path "{directory}/images" is unable to write')
         else:
             os.makedirs(f'{directory}/images')
         
@@ -826,8 +813,7 @@ def GCI(hifi=[], nano=[], directory='.', prefix='GCI', threads=1, map_qual=30, m
             nano_samfile.close()
         
         if set(hifi_refs) != set(nano_refs):
-            print(f'ERROR!!! The targets in hifi and nano alignment files are inconsistent\nPlease check the reference used in mapping both hifi and ont reads', file=sys.stderr)
-            raise SystemExit
+            sys.exit(f'ERROR!!! The targets in hifi and nano alignment files are inconsistent\nPlease check the reference used in mapping both hifi and ont reads')
         
 
         hifi_depths, targets_length = filter(hifi_paf, hifi_bam, prefix+'_hifi', map_qual, mq_cutoff, iden_percent, clip_percent, ovlp_percent, flank_len, directory, force)
@@ -844,10 +830,10 @@ def GCI(hifi=[], nano=[], directory='.', prefix='GCI', threads=1, map_qual=30, m
 
 if __name__=='__main__':
     ###########################
-    ### version = 0.2
+    ### version = 0.3
     ### this version have some limits: -t
     ###########################
-    version = 'GCI version 0.2'
+    version = 'GCI version 0.3'
 
     parser = argparse.ArgumentParser(prog=sys.argv[0], add_help=False, formatter_class=argparse.RawDescriptionHelpFormatter, description='A program for assessing the T2T genome', epilog='Examples:\npython GCI.py -r ref.fa --hifi hifi.bam hifi.paf ... --nano nano.bam nano.paf ...')
 
@@ -874,7 +860,7 @@ if __name__=='__main__':
     group_po.add_argument('-R', '--regions', metavar='FILE', help='Bed file contains regions to plot')
     group_po.add_argument('-dmin', '--depth-min', metavar='FLOAT', type=float, help='Minimum depth in folds of mean coverage for plotting [0.1]', default=0.1)
     group_po.add_argument('-dmax', '--depth-max', metavar='FLOAT', type=float, help='Maximum depth in folds of mean coverage for plotting [4.0]', default=4.0)
-    group_po.add_argument('-ws', '--window-size', metavar='FLOAT', type=float, help='The window size in chromosome units (0-1) when plotting [0.001]', default=0.001)
+    group_po.add_argument('-ws', '--window-size', metavar='INT', type=int, help='The window size when plotting [50000]', default=50000)
     group_po.add_argument('-it', '--image-type', metavar='STR', help='The format of the output images: png or pdf [png]', default='png')
 
     group_op = parser.add_argument_group("Other Options")
@@ -886,8 +872,7 @@ if __name__=='__main__':
     print(f'Used arguments:{args}')
 
     if (args['hifi'] == None) and (args['nano'] == None):
-        print('ERROR!!! Please input at least one type of TGS reads alignment files (PacBio HiFi and/or Oxford Nanopore long reads)\nPlease read the help message use "-h" or "--help"', file=sys.stderr)
-        raise SystemExit
+        sys.exit('ERROR!!! Please input at least one type of TGS reads alignment files (PacBio HiFi and/or Oxford Nanopore long reads)\nPlease read the help message use "-h" or "--help"')
     
     if args['hifi'] != None:
         bam_num = 0
@@ -896,11 +881,9 @@ if __name__=='__main__':
                 if file.endswith('.bam'):
                     bam_num += 1
             else:
-                print(f'ERROR!!! "{file}" is not an available file', file=sys.stderr)
-                raise SystemExit
+                sys.exit(f'ERROR!!! "{file}" is not an available file')
         if bam_num == 0:
-            print('ERROR!!! Please input at least one PacBio HiFi reads bam file\nPlease read the help message use "-h" or "--help"', file=sys.stderr)
-            raise SystemExit
+            sys.exit('ERROR!!! Please input at least one PacBio HiFi reads bam file\nPlease read the help message use "-h" or "--help"')
         
     if args['nano'] != None:
         bam_num = 0
@@ -909,21 +892,17 @@ if __name__=='__main__':
                 if file.endswith('.bam'):
                     bam_num += 1
             else:
-                print(f'ERROR!!! "{file}" is not an available file', file=sys.stderr)
-                raise SystemExit
+                sys.exit(f'ERROR!!! "{file}" is not an available file')
         if bam_num == 0:
-            print('ERROR!!! Please input at least one Oxford Nanopore long reads bam file\nPlease read the help message use "-h" or "--help"', file=sys.stderr)
-            raise SystemExit
+            sys.exit('ERROR!!! Please input at least one Oxford Nanopore long reads bam file\nPlease read the help message use "-h" or "--help"')
     
     if args['reference'] == None:
-        print('ERROR!!! Please input the reference file\nPlease read the help message use "-h" or "--help"', file=sys.stderr)
-        raise SystemExit
+        sys.exit('ERROR!!! Please input the reference file\nPlease read the help message use "-h" or "--help"')
     else:
         if os.path.exists(args['reference']) and os.access(args['reference'], os.R_OK):
             pass
         else:
-            print(f'ERROR!!! \"{args["reference"]}\" is not an available file', file=sys.stderr)
-            raise SystemExit
+            sys.exit(f'ERROR!!! \"{args["reference"]}\" is not an available file')
 
     if args['map_qual'] > args['mq_cutoff']:
         print(f'WARNING!!! The minium mapping quality is {args["map_qual"]} and higher than the cutoff {args["mq_cutoff"]}, which means that wouldn\'t filter any reads\nPlease read the help message use "-h" or "--help"', file=sys.stdout)
