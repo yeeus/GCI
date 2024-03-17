@@ -369,10 +369,15 @@ def complement_merged_depth(merged_depths_bed={}, targets_length={}, flank_len=1
 
     return: a dict containing a list with the content of the sorted lengths of the complement
     """
-    
+    start_flag = False
+    end_flag = False
+    if start != None and end != None:
+        start_flag = True
+        end_flag = True
+
     lengths_com_merged_depth_dict = {}
     for target, length in targets_length.items():
-        if start == None and end == None:
+        if start_flag == False and end_flag == False:
             start = flank_len
             end = length - flank_len
         lengths_com_merged_depth = []
@@ -426,15 +431,19 @@ def merge_merged_depth_bed(merged_depths_bed={}, targets_length={}, dist_percent
     
     return: the merged merged_depths_bed
     """
+    start_flag = False
+    end_flag = False
+    if start != None and end != None:
+        start_flag = True
+        end_flag = True
 
     new_merged_depths_bed = {}
     for target, length in targets_length.items():
         new_merged_depths_bed[target] = []
         dist = length * dist_percent
-        if start == None and end == None:
+        if start_flag == False and end_flag == False:
             start = flank_len
             end = length - flank_len
-        
         current_segment = (start, start)
         for segment in merged_depths_bed[target]:
             if (segment[0] - current_segment[1]) <= dist:
@@ -496,7 +505,7 @@ def compute_index(targets_length={}, prefix='GCI', directory='.', force=False, m
         obs_n50_dict.update({'Genome':obs_n50})
         
         
-        new_merged_depths_bed = merge_merged_depth_bed(merged_depths_bed, targets_length, dist_percent, flank_len, None, None)
+        new_merged_depths_bed = merge_merged_depth_bed(merged_depths_bed, targets_length, dist_percent, flank_len)
         new_obs_lengths_dict = complement_merged_depth(new_merged_depths_bed, targets_length, flank_len)
         new_obs_lengths = [item for value in new_obs_lengths_dict.values() for item in value]
         obs_num_ctg = len(new_obs_lengths)
@@ -534,13 +543,13 @@ def compute_index(targets_length={}, prefix='GCI', directory='.', force=False, m
                 for i, depthss in enumerate(depths_list):
                     depths = depthss[target][start:end]
                     merged_depths_bed = collapse_depth_range({target:depths}, -1, threshold, 0, start)
-                    obs_lengths_dict = complement_merged_depth(merged_depths_bed, {target:exp_n50}, 0, start, end)
+                    obs_lengths_dict = complement_merged_depth(merged_depths_bed, {target:exp_n50}, start, start, end)
                     obs_n50 = compute_n50(obs_lengths_dict[target])
                     new_merged_depths_bed = merge_merged_depth_bed(merged_depths_bed, {target:exp_n50}, dist_percent, start, start, end)
-                    new_obs_lengths_dict = complement_merged_depth(new_merged_depths_bed, {target:exp_n50}, 0, start, end)
+                    new_obs_lengths_dict = complement_merged_depth(new_merged_depths_bed, {target:exp_n50}, start, start, end)
                     obs_num_ctg = len(new_obs_lengths_dict[target])
 
-                    gci.append(100 * log2(obs_n50/exp_n50 + 1) / log2(obs_num_ctg/exp_num_ctg + 1))
+                    gci.append(round(100 * log2(obs_n50/exp_n50 + 1) / log2(obs_num_ctg/exp_num_ctg + 1), 4))
                 with open(f'{directory}/{prefix}.regions.gci', 'a') as f:
                     f.write(f'{target}\t{segment[0]}\t{segment[1]}\t' + '\t'.join(map(str, gci)) + '\n')
         print('Computing GCI scores for regions done!!!\n\n')
