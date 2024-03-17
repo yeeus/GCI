@@ -187,15 +187,19 @@ def merge_merged_depth_bed(merged_depths_bed={}, targets_length={}, dist_percent
     
     return: the merged merged_depths_bed
     """
+    start_flag = False
+    end_flag = False
+    if start != None and end != None:
+        start_flag = True
+        end_flag = True
 
     new_merged_depths_bed = {}
     for target, length in targets_length.items():
         new_merged_depths_bed[target] = []
         dist = length * dist_percent
-        if start == None and end == None:
+        if start_flag == False and end_flag == False:
             start = flank_len
             end = length - flank_len
-        
         current_segment = (start, start)
         for segment in merged_depths_bed[target]:
             if (segment[0] - current_segment[1]) <= dist:
