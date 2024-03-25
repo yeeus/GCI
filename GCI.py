@@ -278,6 +278,7 @@ def merge_two_type_depth(hifi_depths={}, nano_depths={}, prefix='GCI', directory
         nano_depth_list = nano_depths[target]
         for i, depth in enumerate(hifi_depth_list):
             merged_two_type_depths[target].append(max(depth, nano_depth_list[i]))
+        merged_two_type_depths[target] = np.array(merged_two_type_depths[target])
     
 
     with gzip.open(f'{directory}/{prefix}.depth.gz', 'wb') as f:
