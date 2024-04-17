@@ -534,11 +534,15 @@ def compute_index(targets_length={}, prefix='GCI', directory='.', force=False, m
 
     if len(regions_bed) > 0:
         print('Computing GCI scores for regions ...')
+        region_all_lengths = []
+        region_all_obs_length = [[] for i in range(len(depths_list))]
+        region_all_obs_num_ctg = [0 for i in range(len(depths_list))]
         for target, segments in regions_bed.items():
             for segment in segments:
                 start = segment[0]
                 end = segment[1]
                 exp_n50 = end - start
+                region_all_lengths.append(exp_n50)
                 exp_num_ctg = 1
                 gci = []
                 for i, depthss in enumerate(depths_list):
@@ -546,13 +550,24 @@ def compute_index(targets_length={}, prefix='GCI', directory='.', force=False, m
                     merged_depths_bed = collapse_depth_range({target:depths}, -1, threshold, 0, start)
                     obs_lengths_dict = complement_merged_depth(merged_depths_bed, {target:exp_n50}, start, start, end)
                     obs_n50 = compute_n50(obs_lengths_dict[target])
+                    region_all_obs_length[i] += obs_lengths_dict[target]
                     new_merged_depths_bed = merge_merged_depth_bed(merged_depths_bed, {target:exp_n50}, dist_percent, start, start, end)
                     new_obs_lengths_dict = complement_merged_depth(new_merged_depths_bed, {target:exp_n50}, start, start, end)
                     obs_num_ctg = len(new_obs_lengths_dict[target])
+                    region_all_obs_num_ctg[i] += obs_num_ctg
 
                     gci.append(round(100 * log2(obs_n50/exp_n50 + 1) / log2(obs_num_ctg/exp_num_ctg + 1), 4))
                 with open(f'{directory}/{prefix}.regions.gci', 'a') as f:
                     f.write(f'{target}\t{segment[0]}\t{segment[1]}\t' + '\t'.join(map(str, gci)) + '\n')
+        region_all_exp_n50 = compute_n50(region_all_lengths)
+        region_all_exp_num_ctg = len(region_all_lengths)
+        region_all_gci = []
+        for i in range(len(depths_list)):
+            region_all_obs_n50 = compute_n50(region_all_obs_length[i])
+            region_all_gci.append(round(100 * log2(region_all_obs_n50/region_all_exp_n50 + 1) / log2(region_all_obs_num_ctg[i]/region_all_exp_num_ctg + 1), 4))
+        with open(f'{directory}/{prefix}.regions.gci', 'a') as f:
+            f.write('----------------------------------------------------------------------------------------------------------------------------------------\n\n\n')
+            f.write(f'All_regions\t*\t*\t' + '\t'.join(map(str, region_all_gci)) + '\n')
         print('Computing GCI scores for regions done!!!\n\n')
 
 
