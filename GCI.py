@@ -542,7 +542,10 @@ def compute_index(targets_length={}, prefix='GCI', directory='.', force=False, m
                 start = segment[0]
                 end = segment[1]
                 exp_n50 = end - start
-                region_all_lengths.append(exp_n50)
+                if exp_n50 > 0:
+                    region_all_lengths.append(exp_n50)
+                else:
+                    print(f'Warning!!! The region "{target}:{start}-{end}" is not available', file=sys.stderr)
                 exp_num_ctg = 1
                 gci = []
                 for i, depthss in enumerate(depths_list):
@@ -550,11 +553,13 @@ def compute_index(targets_length={}, prefix='GCI', directory='.', force=False, m
                     merged_depths_bed = collapse_depth_range({target:depths}, -1, threshold, 0, start)
                     obs_lengths_dict = complement_merged_depth(merged_depths_bed, {target:exp_n50}, start, start, end)
                     obs_n50 = compute_n50(obs_lengths_dict[target])
-                    region_all_obs_length[i] += obs_lengths_dict[target]
+                    if exp_n50 > 0:
+                        region_all_obs_length[i] += obs_lengths_dict[target]
                     new_merged_depths_bed = merge_merged_depth_bed(merged_depths_bed, {target:exp_n50}, dist_percent, start, start, end)
                     new_obs_lengths_dict = complement_merged_depth(new_merged_depths_bed, {target:exp_n50}, start, start, end)
                     obs_num_ctg = len(new_obs_lengths_dict[target])
-                    region_all_obs_num_ctg[i] += obs_num_ctg
+                    if exp_n50 > 0:
+                        region_all_obs_num_ctg[i] += obs_num_ctg
 
                     if obs_num_ctg == 0:
                         gci.append(0)
@@ -1006,7 +1011,7 @@ if __name__=='__main__':
             sys.exit(f'ERROR!!! \"{args["reference"]}\" is not an available file')
 
     if args['map_qual'] > args['mq_cutoff']:
-        print(f'WARNING!!! The minium mapping quality ({args["map_qual"]}) is higher than the cutoff ({args["mq_cutoff"]}), which means that wouldn\'t filter any reads\nPlease read the help message use "-h" or "--help"', file=sys.stdout)
+        print(f'WARNING!!! The minium mapping quality ({args["map_qual"]}) is higher than the cutoff ({args["mq_cutoff"]}), which means that wouldn\'t filter any reads\nPlease read the help message use "-h" or "--help"', file=sys.stderr)
 
     print(f'Used arguments:{args}')
     GCI(**args)
