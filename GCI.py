@@ -527,8 +527,8 @@ def compute_index(targets_length={}, prefix='GCI', directory='.', force=False, m
                 if obs_num_ctg == 0:
                     gci = 0
                 else:
-                    gci = 100 * log2(obs_n50/exp_n50 + 1) / log2(obs_num_ctg/exp_num_ctg + 1)
-                f.write(f'{target}\t{exp_n50}\t{obs_n50}\t{exp_num_ctg}\t{obs_num_ctg}\t{gci:.4f}\n')
+                    gci = round(100 * log2(obs_n50/exp_n50 + 1) / log2(obs_num_ctg/exp_num_ctg + 1), 4)
+                f.write(f'{target}\t{exp_n50}\t{obs_n50}\t{exp_num_ctg}\t{obs_num_ctg}\t{gci}\n')
             f.write('----------------------------------------------------------------------------------------------------------------------------------------\n\n\n')
         print(f'Writing results to {directory}/{prefix}.gci done!!!\n\n')
 
@@ -556,7 +556,10 @@ def compute_index(targets_length={}, prefix='GCI', directory='.', force=False, m
                     obs_num_ctg = len(new_obs_lengths_dict[target])
                     region_all_obs_num_ctg[i] += obs_num_ctg
 
-                    gci.append(round(100 * log2(obs_n50/exp_n50 + 1) / log2(obs_num_ctg/exp_num_ctg + 1), 4))
+                    if obs_num_ctg == 0:
+                        gci.append(0)
+                    else:
+                        gci.append(round(100 * log2(obs_n50/exp_n50 + 1) / log2(obs_num_ctg/exp_num_ctg + 1), 4))
                 with open(f'{directory}/{prefix}.regions.gci', 'a') as f:
                     f.write(f'{target}\t{segment[0]}\t{segment[1]}\t' + '\t'.join(map(str, gci)) + '\n')
         region_all_exp_n50 = compute_n50(region_all_lengths)
@@ -564,7 +567,10 @@ def compute_index(targets_length={}, prefix='GCI', directory='.', force=False, m
         region_all_gci = []
         for i in range(len(depths_list)):
             region_all_obs_n50 = compute_n50(region_all_obs_length[i])
-            region_all_gci.append(round(100 * log2(region_all_obs_n50/region_all_exp_n50 + 1) / log2(region_all_obs_num_ctg[i]/region_all_exp_num_ctg + 1), 4))
+            if region_all_obs_num_ctg[i] == 0:
+                region_all_gci.append(0)
+            else:
+                region_all_gci.append(round(100 * log2(region_all_obs_n50/region_all_exp_n50 + 1) / log2(region_all_obs_num_ctg[i]/region_all_exp_num_ctg + 1), 4))
         with open(f'{directory}/{prefix}.regions.gci', 'a') as f:
             f.write('----------------------------------------------------------------------------------------------------------------------------------------\n\n\n')
             f.write(f'All_regions\t*\t*\t' + '\t'.join(map(str, region_all_gci)) + '\n')
