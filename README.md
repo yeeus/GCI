@@ -121,8 +121,6 @@ winnowmap -W $mat_repetitive_k15.txt -ax map-pb $mat_asm $mat_hifi > ${mat.winno
 
 samtools view -@ $threads -Sb ${mat.winnowmap.hifi.sam} | samtools sort -@ $threads -o ${mat.winnowmap.hifi.bam}
 samtools index ${mat.minimap2.hifi.bam} ## this is necessary!!!
-paftools.js sam2paf (-p) ${mat.winnowmap.hifi.sam} | sort -k6,6V -k8,8n > ${mat.winnowmap.hifi.paf} ## We recommend to use "-p" to filter the supplementary alignments
-                                                                                                    ## please sort the paf file because our program don't automatically sort the file by the targets names!
 ```
 
 3. Filter the mapping files and get the genome continuity index
