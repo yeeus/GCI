@@ -112,12 +112,8 @@ cat ${canu_pat.fa.gz} ${canu_unknown.fa.gz} > ${canu_pat.final.fa.gz}
 ```
 # minimap2 
 minimap2 -t $threads -ax map-hifi $mat_asm $mat_hifi > ${mat.minimap2.hifi.sam}   ## mapping ONT reads with -ax map-ont
-
-samtools view -@ $threads -Sb ${mat.minimap2.hifi.sam} | samtools sort -@ $threads -o ${mat.minimap2.hifi.bam}
-samtools index ${mat.minimap2.hifi.bam} ## this is necessary!!!
 paftools.js sam2paf (-p) ${mat.minimap2.hifi.sam} | sort -k6,6V -k8,8n > ${mat.minimap2.hifi.paf} ## We recommend to use "-p" to filter the supplementary alignments
                                                                                                   ## please sort the paf file because our program don't automatically sort the file by the targets names!
-
 # winnowmap
 meryl count k=15 output $mat_merylDB $mat_asm
 meryl print greater-than distinct=0.9998 $mat_merylDB > $mat_repetitive_k15.txt
