@@ -37,8 +37,8 @@ As for **GCI**, it requires:
 ```
 python GCI.py --help
 
-usage: GCI.py [-r FILE] [--hifi  [...]] [--nano  [...]] [-R FILE] [-ts INT] [-dp FLOAT] [-d PATH] [-o STR] [-mq INT] [--mq-cutoff INT] [-ip FLOAT]
-              [-op FLOAT] [-cp FLOAT] [-fl INT] [-p] [-dmin FLOAT] [-dmax FLOAT] [-ws INT] [-it STR] [-f] [-h] [-v]
+usage: GCI.py [-r FILE] [--hifi  [...]] [--nano  [...]] [--chrs] [-R FILE] [-ts INT] [-dp FLOAT] [-d PATH] [-o STR] [-mq INT] [--mq-cutoff INT] [-ip FLOAT] [-op FLOAT] [-cp FLOAT] [-fl INT] [-p]
+              [-dmin FLOAT] [-dmax FLOAT] [-ws INT] [-it STR] [-f] [-h] [-v]
 
 A program for assessing the T2T genome
 
@@ -47,8 +47,10 @@ Input/Output:
                         The reference file
   --hifi  [ ...]        PacBio HiFi reads alignment files (at least one bam file)
   --nano  [ ...]        Oxford Nanopore long reads alignment files (at least one bam file)
+  --chrs                A list of chromosomes separated by comma
   -R FILE, --regions FILE
                         Bed file containing regions
+                        Be cautious! If both specify `--chrs` and `--regions`, chromosomes in regions bed file should be included in the chromosomes list
   -ts INT, --threshold INT
                         The threshold of depth to be reported as issues [0]
   -dp FLOAT, --dist-percent FLOAT
@@ -82,7 +84,7 @@ Plot Options:
                         The format of the output images: png or pdf [png]
 
 Other Options:
-  -f, --force           Force rewriting of existing files [false]
+  -f, --force           Force rewriting of existing files [False]
   -h, --help            Show this help message and exit
   -v, --version         Show program's version number and exit
 
@@ -243,4 +245,4 @@ For another helps, please contact quanyu_chen@outlook.com.
 
 
 ### To do
-- speed up
+- speed up and reduce memory usage
