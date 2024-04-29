@@ -8,7 +8,6 @@ from Bio import SeqIO
 import matplotlib.pyplot as plt
 import matplotlib.lines as mlines
 from matplotlib.ticker import AutoMinorLocator
-from matplotlib.ticker import ScalarFormatter
 
 
 def get_Ns_ref(reference=None, prefix='GCI', directory='.', force=False):
@@ -84,8 +83,9 @@ def merge_gaps_depths(depths={}, Ns_bed=None):
     """
     if Ns_bed != None:
         for target, segments in Ns_bed.items():
-            for segment in segments:
-                depths[target][segment[0]:segment[1]] = 0
+            if target in depths.keys():
+                for segment in segments:
+                    depths[target][segment[0]:segment[1]] = 0
     return depths
 
 
@@ -432,6 +432,19 @@ def preprocessing(reference=None, hifi=None, nano=None, directory='.', prefix='G
     for record in SeqIO.parse(reference, 'fasta'):
         ref_refs.append(record.id)
     
+    if hifi != None:
+        hifi_depths, hifi_targets_length = parse_depth(hifi)
+        for i in hifi_targets_length.keys():
+            if i not in ref_refs:
+                sys.exit('ERROR!!! The targets in hifi depth file are inconsistent with the reference file\nPlease check both hifi depth file and the reference')
+        hifi_depths = merge_gaps_depths(hifi_depths, Ns_bed)
+    if nano != None:
+        nano_depths, nano_targets_length = parse_depth(nano)
+        for i in nano_targets_length.keys():
+            if i not in ref_refs:
+                sys.exit('ERROR!!! The targets in ont depth file are inconsistent with the reference file\nPlease check both ont depth file and the reference')
+        nano_depths = merge_gaps_depths(nano_depths, Ns_bed)
+    
     regions_bed = {}
     if regions != None:
         if os.path.exists(regions) and os.access(regions, os.R_OK):
@@ -443,29 +456,21 @@ def preprocessing(reference=None, hifi=None, nano=None, directory='.', prefix='G
                     regions_bed[target].append((int(start), int(end)))
         else:
             sys.exit(f'ERROR!!! "{regions}" is not an available file')
+    if len(regions_bed) > 0:
+        for i in regions_bed.keys():
+            if i not in ref_refs:
+                sys.exit(f'ERROR!!! Chromosome "{i}" provided by `--regions` is not in the reference')
+    
     
     if nano == None:
-        depths, targets_length = parse_depth(hifi)
-        if set(targets_length.keys()) != set(ref_refs):
-            sys.exit('ERROR!!! The targets in hifi depth file are inconsistent with the reference file\nPlease check both hifi depth file and the reference')
-        depths = merge_gaps_depths(depths, Ns_bed)
-        plot_depth([depths], depth_min, depth_max, window_size, image_type, directory, prefix, force, targets_length, dist_percent, regions_bed, threshold)
+        plot_depth([hifi_depths], depth_min, depth_max, window_size, image_type, directory, prefix, force, hifi_targets_length, dist_percent, regions_bed, threshold)
     elif hifi == None:
-        depths, targets_length = parse_depth(nano)
-        if set(targets_length.keys()) != set(ref_refs):
-            sys.exit('ERROR!!! The targets in ont depth file are inconsistent with the reference file\nPlease check both ont depth file and the reference')
-        depths = merge_gaps_depths(depths, Ns_bed)
-        plot_depth([depths], depth_min, depth_max, window_size, image_type, directory, prefix, force, Ns_bed)
+        plot_depth([nano_depths], depth_min, depth_max, window_size, image_type, directory, prefix, force, nano_targets_length, dist_percent, regions_bed, threshold)
     else:
-        hifi_depths, targets_length = parse_depth(hifi)
-        if set(targets_length.keys()) != set(ref_refs):
-            sys.exit('ERROR!!! The targets in hifi depth file are inconsistent with the reference file\nPlease check both hifi depth file and the reference')
-        hifi_depths = merge_gaps_depths(hifi_depths, Ns_bed)
-        nano_depths, targets_length = parse_depth(nano)
-        if set(targets_length.keys()) != set(ref_refs):
-            sys.exit('ERROR!!! The targets in ont depth file are inconsistent with the reference file\nPlease check both ont depth file and the reference')
-        nano_depths = merge_gaps_depths(nano_depths, Ns_bed)
-        plot_depth([hifi_depths, nano_depths], depth_min, depth_max, window_size, image_type, directory, prefix, force, Ns_bed, targets_length, dist_percent, regions)
+        for target, length in hifi_targets_length.items():
+            if length != nano_targets_length[target]:
+                sys.exit(f'ERROR!!! The element "{target}:{length}" in hifi is inconsistent with that in ont depth file which is "{target}:{nano_targets_length[target]}"\nPlease check both depth files')
+        plot_depth([hifi_depths, nano_depths], depth_min, depth_max, window_size, image_type, directory, prefix, force, hifi_targets_length, dist_percent, regions_bed, threshold)
 
 
 if __name__=='__main__':
@@ -488,7 +493,7 @@ if __name__=='__main__':
 
 
     group_op = parser.add_argument_group("Other Options")
-    group_op.add_argument('-f', '--force', action='store_const', help='Force rewriting of existing files', const=True, default=False)
+    group_op.add_argument('-f', '--force', action='store_const', help='Force rewriting of existing files [False]', const=True, default=False)
     group_op.add_argument('-h', '--help', action="help", help="Show this help message and exit")
 
     args = vars(parser.parse_args())
