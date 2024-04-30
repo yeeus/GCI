@@ -502,12 +502,15 @@ def compute_index(targets_length={}, prefix='GCI', directory='.', force=False, m
     print('Computing Theoretical minimum N50 and contigs number ...')
     exp_n50_dict = dict(targets_length)
     exp_num_ctg_dict = {target:1 for target in targets_length.keys()}
+    exp_lengths = [length for length in targets_length.values()]
+    exp_n50 = compute_n50(exp_lengths)
+    exp_num_ctg = len(exp_lengths)
     if len(chrs_list) == 0:
-        exp_lengths = [length for length in targets_length.values()]
-        exp_n50 = compute_n50(exp_lengths)
-        exp_num_ctg = len(exp_lengths)
         exp_n50_dict.update({'Genome':exp_n50})
         exp_num_ctg_dict.update({'Genome':exp_num_ctg})
+    else:
+        exp_n50_dict.update({'All_chromosomes':exp_n50})
+        exp_num_ctg_dict.update({'All_chromosomes':exp_num_ctg})
     print('Computing Theoretical minimum N50 and contigs number done!!!')
 
 
@@ -515,18 +518,22 @@ def compute_index(targets_length={}, prefix='GCI', directory='.', force=False, m
         print(f'Computing Curated N50 and contigs number for {type_list[i]} ...')
         obs_lengths_dict = complement_merged_depth(merged_depths_bed, targets_length, flank_len)
         obs_n50_dict = {target:compute_n50(lengths) for target, lengths in obs_lengths_dict.items()}
+        obs_lengths = [item for value in obs_lengths_dict.values() for item in value]
+        obs_n50 = compute_n50(obs_lengths)
         if len(chrs_list) == 0:
-            obs_lengths = [item for value in obs_lengths_dict.values() for item in value]
-            obs_n50 = compute_n50(obs_lengths)
             obs_n50_dict.update({'Genome':obs_n50})
+        else:
+            obs_n50_dict.update({'All_chromosomes':obs_n50})
         
         new_merged_depths_bed = merge_merged_depth_bed(merged_depths_bed, targets_length, dist_percent, flank_len)
         new_obs_lengths_dict = complement_merged_depth(new_merged_depths_bed, targets_length, flank_len)
         obs_num_ctg_dict = {target:len(lengths) for target, lengths in new_obs_lengths_dict.items()}
+        new_obs_lengths = [item for value in new_obs_lengths_dict.values() for item in value]
+        obs_num_ctg = len(new_obs_lengths)
         if len(chrs_list) == 0:
-            new_obs_lengths = [item for value in new_obs_lengths_dict.values() for item in value]
-            obs_num_ctg = len(new_obs_lengths)
             obs_num_ctg_dict.update({'Genome':obs_num_ctg})
+        else:
+            obs_num_ctg_dict.update({'All_chromosomes':obs_num_ctg})
         print(f'Computing Curated N50 and contigs number for {type_list[i]} done!!!')
 
 
