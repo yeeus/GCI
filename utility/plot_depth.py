@@ -467,9 +467,12 @@ def preprocessing(reference=None, hifi=None, nano=None, directory='.', prefix='G
     elif hifi == None:
         plot_depth([nano_depths], depth_min, depth_max, window_size, image_type, directory, prefix, force, nano_targets_length, dist_percent, regions_bed, threshold)
     else:
-        for target, length in hifi_targets_length.items():
-            if length != nano_targets_length[target]:
-                sys.exit(f'ERROR!!! The element "{target}:{length}" in hifi is inconsistent with that in ont depth file which is "{target}:{nano_targets_length[target]}"\nPlease check both depth files')
+        if set(hifi_targets_length.keys()) != set(nano_targets_length.keys()):
+            sys.exit(f'ERROR!!! The targets in hifi and nano alignment files are inconsistent\nPlease check the reference used in mapping both hifi and ont reads')
+        else:
+            for target, length in hifi_targets_length.items():
+                if length != nano_targets_length[target]:
+                    sys.exit(f'ERROR!!! The element "{target}:{length}" in hifi is inconsistent with that in ont depth file which is "{target}:{nano_targets_length[target]}"\nPlease check both depth files')
         plot_depth([hifi_depths, nano_depths], depth_min, depth_max, window_size, image_type, directory, prefix, force, hifi_targets_length, dist_percent, regions_bed, threshold)
 
 
