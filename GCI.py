@@ -286,8 +286,8 @@ def merge_two_type_depth(hifi_depths={}, nano_depths={}, prefix='GCI', directory
     merged_two_type_depths = {target:[] for target in hifi_depths.keys()}
     for target, hifi_depth_list in hifi_depths.items():
         nano_depth_list = nano_depths[target]
-        for i, depth in enumerate(hifi_depth_list):
-            merged_two_type_depths[target].append(max(depth, nano_depth_list[i]))
+        for (hifi_depth, nano_depth) in zip(hifi_depth_list, nano_depth_list):
+            merged_two_type_depths[target].append(max(hifi_depth, nano_depth))
         merged_two_type_depths[target] = np.array(merged_two_type_depths[target])
     
 
