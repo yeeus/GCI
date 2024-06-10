@@ -903,29 +903,29 @@ def GCI(hifi=[], nano=[], directory='.', prefix='GCI', map_qual=30, mq_cutoff=50
     hifi_paf = []
     nano_bam = []
     nano_paf = []
-    hifi_refs = []
-    nano_refs = []
+    hifi_refs_lengths = {}
+    nano_refs_lengths = {}
     if hifi != None:
         for file in hifi:
             if file.endswith('.bam'):
                 hifi_bam.append(file)
                 hifi_samfile = pysam.AlignmentFile(file, 'rb')
-                hifi_refs += hifi_samfile.references
+                hifi_refs_lengths = {reference:length for (reference, length) in zip(hifi_samfile.references, hifi_samfile.lengths)}
                 hifi_samfile.close()
             else:
                 hifi_paf.append(file)
-        if set(hifi_refs) != set(ref_refs):
+        if set(hifi_refs_lengths.keys()) != set(ref_refs):
             sys.exit('ERROR!!! The targets in hifi alignment files are inconsistent with the reference file\nPlease check both hifi alignment files and the reference')
     if nano != None:
         for file in nano:
             if file.endswith('.bam'):
                 nano_bam.append(file)
                 nano_samfile = pysam.AlignmentFile(file, 'rb')
-                nano_refs += nano_samfile.references
+                nano_refs_lengths = {reference:length for (reference, length) in zip(nano_samfile.references, nano_samfile.lengths)}
                 nano_samfile.close()
             else:
                 nano_paf.append(file)
-        if set(nano_refs) != set(ref_refs):
+        if set(nano_refs_lengths.keys()) != set(ref_refs):
             sys.exit('ERROR!!! The targets in ont alignment files are inconsistent with the reference file\nPlease check both ont alignment files and the reference')
         
 
@@ -954,8 +954,11 @@ def GCI(hifi=[], nano=[], directory='.', prefix='GCI', map_qual=30, mq_cutoff=50
             plot_depth([depths], depth_min, depth_max, window_size, image_type, directory, prefix, force, targets_length, dist_percent, regions_bed, threshold)
     
     else:
-        if set(hifi_refs) != set(nano_refs):
+        if set(hifi_refs_lengths.keys()) != set(nano_refs_lengths.keys()):
             sys.exit(f'ERROR!!! The targets in hifi and nano alignment files are inconsistent\nPlease check the reference used in mapping both hifi and ont reads')
+        for target, length in hifi_refs_lengths.items():
+            if length != nano_refs_lengths[target]:
+                sys.exit(f'ERROR!!! The element "{target}:{length}" in hifi alignment files are inconsistent with that in ont alignment files which is "{target}:{nano_refs_lengths[target]}"\nPlease check the reference used in mapping both hifi and ont reads')
 
         hifi_depths, targets_length = filter(hifi_paf, hifi_bam, prefix+'_hifi', map_qual, mq_cutoff, iden_percent, clip_percent, ovlp_percent, flank_len, directory, force, 'HiFi', chrs_list)
         hifi_depths = merge_gaps_depths(hifi_depths, Ns_bed)
