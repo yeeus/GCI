@@ -427,7 +427,7 @@ def compute_index(targets_length={}, prefix='GCI', directory='.', force=False, m
         print('Computing GCI scores for regions done!!!\n\n')
 
 
-def GCI(hifi=None, nano=None, two_type=None, directory='.', prefix='GCI', flank_len=15, threshold=0, force=False, dist_percent=0.005, reference=None, regions=None, chrs=None):
+def GCI(hifi=None, nano=None, two_type=None, directory='.', prefix='GCI', flank_len=15, threshold=0, force=False, dist_percent=0.005, reference=None, regions=None, chrs=None, bed_input=False):
     chrs_list = []
     if chrs != None:
         chrs_list = chrs.strip().split(',')
@@ -458,16 +458,16 @@ def GCI(hifi=None, nano=None, two_type=None, directory='.', prefix='GCI', flank_
         sys.exit(f'ERROR!!! The prefix "{prefix}" is not allowed')
     
     
-    ref_refs = []
+    ref_refs = {}
     for record in SeqIO.parse(reference, 'fasta'):
-        ref_refs.append(record.id)
+        ref_refs[record.id] = len(record)
     if len(chrs_list) > 0:
         for i in chrs_list:
-            if i not in ref_refs:
+            if i not in ref_refs.keys():
                 sys.exit(f'ERROR!!! Chromosome "{i}" provided by `--chrs` is not in the reference')
     if len(regions_bed) > 0:
         for i in regions_bed.keys():
-            if i not in ref_refs:
+            if i not in ref_refs.keys():
                 sys.exit(f'ERROR!!! Chromosome "{i}" provided by `--regions` is not in the reference')
     if len(chrs_list) > 0 and len(regions_bed) > 0:
         if not all(i in chrs_list for i in regions_bed.keys()):
@@ -482,65 +482,95 @@ def GCI(hifi=None, nano=None, two_type=None, directory='.', prefix='GCI', flank_
     
 
     if hifi != None:
-        hifi_depths, hifi_targets_length = parse_depth(hifi)
-        for i in hifi_targets_length.keys():
-            if i not in ref_refs:
-                sys.exit('ERROR!!! The targets in hifi depth file are inconsistent with the reference file\nPlease check both hifi depth file and the reference')
-        hifi_depths = merge_gaps_depths(hifi_depths, Ns_bed)
-        hifi_merged_depth_bed = merge_depth(hifi_depths, prefix, threshold, flank_len, directory, force, 'HiFi')
+        if bed_input == False:
+            hifi_depths, hifi_targets_length = parse_depth(hifi)
+            for i in hifi_targets_length.keys():
+                if i not in ref_refs.keys():
+                    sys.exit('ERROR!!! The targets in hifi depth file are inconsistent with the reference file\nPlease check both hifi depth file and the reference')
+            hifi_depths = merge_gaps_depths(hifi_depths, Ns_bed)
+            hifi_merged_depth_bed = merge_depth(hifi_depths, prefix, threshold, flank_len, directory, force, 'HiFi')
+        else:
+            hifi_merged_depth_bed = {target:[] for target in ref_refs.keys()}
+            with open(hifi, 'r') as f:
+                for line in f:
+                    target, start, end = line.strip().split('\t')
+                    if target not in hifi_merged_depth_bed.keys():
+                        sys.exit('ERROR!!! The targets in hifi bed file are inconsistent with the reference file\nPlease check both hifi bed file and the reference')
+                    hifi_merged_depth_bed[target].append((int(start), int(end)))
+            hifi_depths = None
     if nano != None:
-        nano_depths, nano_targets_length = parse_depth(nano)
-        for i in nano_targets_length.keys():
-            if i not in ref_refs:
-                sys.exit('ERROR!!! The targets in ont depth file are inconsistent with the reference file\nPlease check both ont depth file and the reference')
-        nano_depths = merge_gaps_depths(nano_depths, Ns_bed)
-        nano_merged_depth_bed = merge_depth(nano_depths, prefix, threshold, flank_len, directory, force, 'ONT')
+        if bed_input == False:
+            nano_depths, nano_targets_length = parse_depth(nano)
+            for i in nano_targets_length.keys():
+                if i not in ref_refs.keys():
+                    sys.exit('ERROR!!! The targets in ont depth file are inconsistent with the reference file\nPlease check both ont depth file and the reference')
+            nano_depths = merge_gaps_depths(nano_depths, Ns_bed)
+            nano_merged_depth_bed = merge_depth(nano_depths, prefix, threshold, flank_len, directory, force, 'ONT')
+        else:
+            nano_merged_depth_bed = {target:[] for target in ref_refs.keys()}
+            with open(nano, 'r') as f:
+                for line in f:
+                    target, start, end = line.strip().split('\t')
+                    if target not in nano_merged_depth_bed.keys():
+                        sys.exit('ERROR!!! The targets in ont bed file are inconsistent with the reference file\nPlease check both ont bed file and the reference')
+                    nano_merged_depth_bed[target].append((int(start), int(end)))
+            nano_depths = None
     if two_type != None:
-        two_type_depths, two_type_targets_length = parse_depth(two_type)
-        for i in two_type_targets_length.keys():
-            if i not in ref_refs:
-                sys.exit('ERROR!!! The targets in two_type depth file are inconsistent with the reference file\nPlease check both two_type depth file and the reference')
-        two_type_depths = merge_gaps_depths(two_type_depths, Ns_bed)
-        two_type_merged_depth_bed = merge_depth(two_type_depths, prefix, threshold, flank_len, directory, force, 'two_types')
-
-    
-    if hifi != None and nano != None:
-        if set(hifi_targets_length.keys()) != set(nano_targets_length.keys()):
-            sys.exit(f'ERROR!!! The targets in hifi and nano alignment files are inconsistent\nPlease check the reference used in mapping both hifi and ont reads')
+        if bed_input == False:
+            two_type_depths, two_type_targets_length = parse_depth(two_type)
+            for i in two_type_targets_length.keys():
+                if i not in ref_refs.keys():
+                    sys.exit('ERROR!!! The targets in two_type depth file are inconsistent with the reference file\nPlease check both two_type depth file and the reference')
+            two_type_depths = merge_gaps_depths(two_type_depths, Ns_bed)
+            two_type_merged_depth_bed = merge_depth(two_type_depths, prefix, threshold, flank_len, directory, force, 'two_types')
         else:
-            for target, length in hifi_targets_length.items():
-                if length != nano_targets_length[target]:
-                    sys.exit(f'ERROR!!! The element "{target}:{length}" in hifi depth file is inconsistent with that in ont depth file which is "{target}:{nano_targets_length[target]}"\nPlease check both depth files')
-    if hifi != None and two_type != None:
-        if set(hifi_targets_length.keys()) != set(two_type_targets_length.keys()):
-            sys.exit(f'ERROR!!! The targets in hifi and two_type alignment files are inconsistent\nPlease check the reference used in mapping both hifi and ont reads')
-        else:
-            for target, length in hifi_targets_length.items():
-                if length != two_type_targets_length[target]:
-                    sys.exit(f'ERROR!!! The element "{target}:{length}" in hifi depth file is inconsistent with that in two_type depth file which is "{target}:{two_type_targets_length[target]}"\nPlease check both depth files')
-    if nano != None and two_type != None:
-        if set(nano_targets_length.keys()) != set(two_type_targets_length.keys()):
-            sys.exit(f'ERROR!!! The targets in ont and two_type alignment files are inconsistent\nPlease check the reference used in mapping both hifi and ont reads')
-        else:
-            for target, length in nano_targets_length.items():
-                if length != two_type_targets_length[target]:
-                    sys.exit(f'ERROR!!! The element "{target}:{length}" in ont depth file is inconsistent with that in two_type depth file which is "{target}:{two_type_targets_length[target]}"\nPlease check both depth files')
+            two_type_merged_depth_bed = {target:[] for target in ref_refs.keys()}
+            with open(two_type, 'r') as f:
+                for line in f:
+                    target, start, end = line.strip().split('\t')
+                    if target not in two_type_merged_depth_bed.keys():
+                        sys.exit('ERROR!!! The targets in two_type bed file are inconsistent with the reference file\nPlease check both two_type bed file and the reference')
+                    two_type_merged_depth_bed[target].append((int(start), int(end)))
+            two_type_depths = None
+            
+    if bed_input == False:
+        if hifi != None and nano != None:
+            if set(hifi_targets_length.keys()) != set(nano_targets_length.keys()):
+                sys.exit(f'ERROR!!! The targets in hifi and nano alignment files are inconsistent\nPlease check the reference used in mapping both hifi and ont reads')
+            else:
+                for target, length in hifi_targets_length.items():
+                    if length != nano_targets_length[target]:
+                        sys.exit(f'ERROR!!! The element "{target}:{length}" in hifi depth file is inconsistent with that in ont depth file which is "{target}:{nano_targets_length[target]}"\nPlease check both depth files')
+        if hifi != None and two_type != None:
+            if set(hifi_targets_length.keys()) != set(two_type_targets_length.keys()):
+                sys.exit(f'ERROR!!! The targets in hifi and two_type alignment files are inconsistent\nPlease check the reference used in mapping both hifi and ont reads')
+            else:
+                for target, length in hifi_targets_length.items():
+                    if length != two_type_targets_length[target]:
+                        sys.exit(f'ERROR!!! The element "{target}:{length}" in hifi depth file is inconsistent with that in two_type depth file which is "{target}:{two_type_targets_length[target]}"\nPlease check both depth files')
+        if nano != None and two_type != None:
+            if set(nano_targets_length.keys()) != set(two_type_targets_length.keys()):
+                sys.exit(f'ERROR!!! The targets in ont and two_type alignment files are inconsistent\nPlease check the reference used in mapping both hifi and ont reads')
+            else:
+                for target, length in nano_targets_length.items():
+                    if length != two_type_targets_length[target]:
+                        sys.exit(f'ERROR!!! The element "{target}:{length}" in ont depth file is inconsistent with that in two_type depth file which is "{target}:{two_type_targets_length[target]}"\nPlease check both depth files')
     
 
     if hifi != None and nano == None and two_type == None:
-        compute_index(hifi_targets_length, prefix, directory, force, [hifi_merged_depth_bed], ['HiFi'], flank_len, dist_percent, regions_bed, [hifi_depths], threshold, chrs_list)
+        compute_index(ref_refs, prefix, directory, force, [hifi_merged_depth_bed], ['HiFi'], flank_len, dist_percent, regions_bed, [hifi_depths], threshold, chrs_list)
     elif hifi == None and nano != None and two_type == None:
-        compute_index(nano_targets_length, prefix, directory, force, [nano_merged_depth_bed], ['Nano'], flank_len, dist_percent, regions_bed, [nano_depths], threshold, chrs_list)
+        compute_index(ref_refs, prefix, directory, force, [nano_merged_depth_bed], ['Nano'], flank_len, dist_percent, regions_bed, [nano_depths], threshold, chrs_list)
     elif hifi == None and nano == None and two_type != None:
-        compute_index(two_type_targets_length, prefix, directory, force, [two_type_merged_depth_bed], ['HiFi + Nano'], flank_len, dist_percent, regions_bed, [two_type_depths], threshold, chrs_list)
+        compute_index(ref_refs, prefix, directory, force, [two_type_merged_depth_bed], ['HiFi + Nano'], flank_len, dist_percent, regions_bed, [two_type_depths], threshold, chrs_list)
     elif hifi != None and nano != None and two_type == None:
-        compute_index(hifi_targets_length, prefix, directory, force, [hifi_merged_depth_bed, nano_merged_depth_bed], ['HiFi', 'Nano'], flank_len, dist_percent, regions_bed, [hifi_depths, nano_depths], threshold, chrs_list)
+        compute_index(ref_refs, prefix, directory, force, [hifi_merged_depth_bed, nano_merged_depth_bed], ['HiFi', 'Nano'], flank_len, dist_percent, regions_bed, [hifi_depths, nano_depths], threshold, chrs_list)
     elif hifi != None and nano == None and two_type != None:
-        compute_index(hifi_targets_length, prefix, directory, force, [hifi_merged_depth_bed, two_type_merged_depth_bed], ['HiFi', 'HiFi + Nano'], flank_len, dist_percent, regions_bed, [hifi_depths, two_type_depths], threshold, chrs_list)
+        compute_index(ref_refs, prefix, directory, force, [hifi_merged_depth_bed, two_type_merged_depth_bed], ['HiFi', 'HiFi + Nano'], flank_len, dist_percent, regions_bed, [hifi_depths, two_type_depths], threshold, chrs_list)
     elif hifi == None and nano != None and two_type != None:
-        compute_index(nano_targets_length, prefix, directory, force, [nano_merged_depth_bed, two_type_merged_depth_bed], ['Nano', 'HiFi + Nano'], flank_len, dist_percent, regions_bed, [nano_depths, two_type_depths], threshold, chrs_list)
+        compute_index(ref_refs, prefix, directory, force, [nano_merged_depth_bed, two_type_merged_depth_bed], ['Nano', 'HiFi + Nano'], flank_len, dist_percent, regions_bed, [nano_depths, two_type_depths], threshold, chrs_list)
     elif hifi != None and nano != None and two_type != None:
-        compute_index(hifi_targets_length, prefix, directory, force, [hifi_merged_depth_bed, nano_merged_depth_bed, two_type_merged_depth_bed], ['HiFi', 'Nano', 'HiFi + Nano'], flank_len, dist_percent, regions_bed, [hifi_depths, nano_depths, two_type_depths], threshold, chrs_list)
+        compute_index(ref_refs, prefix, directory, force, [hifi_merged_depth_bed, nano_merged_depth_bed, two_type_merged_depth_bed], ['HiFi', 'Nano', 'HiFi + Nano'], flank_len, dist_percent, regions_bed, [hifi_depths, nano_depths, two_type_depths], threshold, chrs_list)
 
     print('GCI finished!!!\nBye!!!')
 
@@ -553,6 +583,7 @@ if __name__=='__main__':
     group_io.add_argument('--hifi', metavar='FILE', help='The gzipped whole-genome depth file generated by the hifi alignment file')
     group_io.add_argument('--nano', metavar='FILE', help='The gzipped whole-genome depth file generated by the ont alignment file')
     group_io.add_argument('--two-type', metavar='FILE', help='The gzipped whole-genome depth file generated by the GCI.py by combining the alignment results of hifi and ont (recommended)')
+    group_io.add_argument('--bed', dest='bed_input', action='store_const', help='Providing bed files generated by GCI.py instead of depth file\nBe cautious! This option can be used only for whole genome (i.e. can\'t be used along with `--regions`)', const=True, default=False)
     group_io.add_argument('--chrs', metavar='', help='A list of chromosomes separated by comma')
     group_io.add_argument('-R', '--regions', metavar='FILE', help='Bed file containing regions\nBe cautious! If both specify `--chrs` and `--regions`, chromosomes in regions bed file should be included in the chromosomes list')
     group_io.add_argument('-ts', '--threshold', metavar='INT', type=int, help='The threshold of depth to be reported as issues [0]', default=0)
@@ -597,6 +628,9 @@ if __name__=='__main__':
             pass
         else:
             sys.exit(f'ERROR!!! \"{args["reference"]}\" is not an available file')
+    
+    if args['bed_input'] == True and args['regions'] != None:
+        sys.exit(f'ERROR!!! Option `--bed` can\'t be used along with `--regions`\nPlease read the help message use "-h" or "--help"')
 
     print(f'Used arguments:{args}')
     GCI(**args)
