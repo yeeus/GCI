@@ -250,7 +250,7 @@ We benchmarked GCI in many genomes:
 
 
 ### Citation
-Chen, Quanyu, et al. "GCI: a continuity inspector for complete genome assembly." bioRxiv (2024): 2024-04.
+[Chen, Quanyu, et al. "GCI: a continuity inspector for complete genome assembly." bioRxiv (2024): 2024-04.](https://doi.org/10.1101/2024.04.06.588431)
 
 ### Help
 If you get any problems, please raise an [issue](https://github.com/yeeus/GCI/issues) first.
