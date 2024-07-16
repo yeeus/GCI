@@ -135,6 +135,21 @@ We recommend to input only one alignment file per software (minimap2 and winnowm
 python GCI.py -r ref.fa --hifi hifi.bam hifi.paf --nano ont.bam ont.paf -d mat -o mat -p -it pdf ...
 ```
 
+4. Running GCI with test files
+
+You can first download the test files from [zenodo](https://zenodo.org/records/12748594)
+```
+tar zxf example.tar.gz
+
+# Then you can run GCI on the test data (it will take some seconds)
+python GCI.py -r example/MH63.fasta \
+       --hifi example/MH63_winnowmap_hifi.subsample.bam example/MH63.minimap2_hifi.subsample.paf \
+       -d my_test -o MH63 -f
+
+# And you will get output files my_test/MH63.depth.gz, my_test/MH63.0.depth.bed, and my_test/MH63.gci
+# which will be the same as files provided in folder example
+```
+
 ### Outputs
 #### only providing one type of reads
 - ${dictionay}/
@@ -170,12 +185,14 @@ python GCI.py -r ref.fa --hifi hifi.bam hifi.paf --nano ont.bam ont.paf -d mat -
 
 
 ### Benchmark
-We benchmarked GCI in many genomes:
+We benchmarked GCI in many genomes (details seen in [citation](https://github.com/yeeus/GCI#citation)):
 | Type of reads                |  CHM13.v.2.0   | CN1.mat.v0.9  | CN1.pat.v0.9  | HG002.mat.cur.20211005 | HG002.pat.cur.20211005 | GGswu          | Col-CEN.v1.2   | MH63RS3       |
 | :--------------------------: | :----------:   | :----------:  | :----------:  | :--------------------: | :--------------------: | :---:          | :----------:   | :-----:       |
 | HiFi (depth; GCI)            | ~58x; 41.8259  | ~44x; 22.8391 | ~44x; 22.4743 | ~83x; 7.2645           | ~83x; 11.9397          | ~51x; 7.9901   | ~90x; 30.7545  | ~39x; 49.8945 | 
-| Nano (depth; GCI)            | ~134x; 87.0425 | ~39x; 51.5398 | ~39x; 63.0391 | ~257x; 18.3920         | ~257x; 27.1588         | ~103x; 30.4181 | ~480x; 99.9999 |               | 
-| HiFi + Nano                  | 87.0425        | 66.7940       | 77.8956       | 18.7177                | 27.7796                | 29.3659        | 99.9999        |               | 
+| Nano (depth; GCI)            | ~134x; 87.0425 | ~39x; 51.5398 | ~39x; 63.0391 | ~257x; 18.3920         | ~257x; 27.1588         | ~103x; 30.4181 | ~480x; 99.9999 |       NA      | 
+| HiFi + Nano                  | 87.0425        | 66.7940       | 77.8956       | 18.7177                | 27.7796                | 29.3659        | 99.9999        |       NA      | 
+| RAM (Gb)                     | 74.25          | NA            | NA            | NA                     | NA                     | NA             | 14.10          |     4.58      | 
+| User time                    | 6.03h          | NA            | NA            | NA                     | NA                     | NA             | 22.74m         |     9.46m     | 
 
 *Note: all the results are computed using one bam file from winnowmap and one paf file from minimap2*
 
