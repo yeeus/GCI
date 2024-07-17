@@ -201,7 +201,7 @@ We benchmarked GCI in many genomes (details seen in [citation](https://github.co
 | RAM (Gb)                     | 74.25          | NA            | NA            | NA                     | NA                     | NA             | 14.10          |     4.58      | 
 | User time                    | 6.03h          | NA            | NA            | NA                     | NA                     | NA             | 22.74m         |     9.46m     | 
 
-*Note: all the results are computed using one bam file from winnowmap and one paf file from minimap2*
+*Note: all the results are computed using one bam file from winnowmap and one paf file from minimap2 which would be sightly higher than all bams*
 
 ### Utility
 - filter_bam.py
@@ -282,4 +282,5 @@ For another helps, please contact quanyu_chen@outlook.com.
 
 
 ### To do
+- for paf files: add cigar operations, as well as add query to high_qual_querys in the end instead of at reading paf files
 - speed up and reduce memory usage
