@@ -114,23 +114,30 @@ cat ${canu_pat.fa.gz} ${canu_unknown.fa.gz} > ${canu_pat.final.fa.gz}
 ```
 # minimap2 
 minimap2 -t $threads -ax map-hifi $mat_asm $mat_hifi > ${mat.minimap2.hifi.sam}   ## mapping ONT reads with -ax map-ont
+samtools view -@ $threads -Sb ${mat.minimap2.hifi.sam} | samtools sort -@ $threads -o ${mat.minimap2.hifi.bam}
+samtools index ${mat.minimap2.hifi.bam} ## this is necessary!!!
+
+## If providing paf file, we recommend using paftools to convert sam to paf
 paftools.js sam2paf ${mat.minimap2.hifi.sam} | sort -k6,6V -k8,8n > ${mat.minimap2.hifi.paf} ## please sort the paf file because our program don't automatically sort the file by the targets names!
 
 # winnowmap
 meryl count k=15 output $mat_merylDB $mat_asm
 meryl print greater-than distinct=0.9998 $mat_merylDB > $mat_repetitive_k15.txt
-winnowmap -W $mat_repetitive_k15.txt -ax map-pb $mat_asm $mat_hifi > ${mat.winnowmap.hifi.sam}   ## mapping ONT reads with -ax map-ont
-
+winnowmap -W $mat_repetitive_k15.txt -ax map-pb $mat_asm $mat_hifi > ${mat.winnowmap.hifi.sam}
 samtools view -@ $threads -Sb ${mat.winnowmap.hifi.sam} | samtools sort -@ $threads -o ${mat.winnowmap.hifi.bam}
-samtools index ${mat.minimap2.hifi.bam} ## this is necessary!!!
+samtools index ${mat.minimap2.hifi.bam}
+paftools.js sam2paf ${mat.winnowmap.hifi.sam} | sort -k6,6V -k8,8n > ${mat.winnowmap.hifi.paf}
 ```
 
 3. Filter the mapping files and get the genome continuity index
 
-We recommend to input only one alignment file per software (minimap2 and winnowmap) using the same set of long reads. **Importantly,** there needs at least one bam file for one type of long reads, which means you'll get errors when providing only paf files.
+We recommend to input only one alignment file per software (minimap2 and winnowmap) using the same set of long reads. 
+
+**Importantly,** GCI needs at least one bam file for one type of long reads, which means you'll get errors when providing only paf files.
 ```
 # Before this, make sure you've generated the index file (.bai) for bam files
 # We recommend to input one bam and one paf file produced by two softwares (for example, one bam file from winnowmap and one paf file from minimap2)
+# which would be theoretically faster and consume less memory but at the cost of lower sensitivity relative to all bams 
 # PDF is recommended because PNG file may lose some details though GCI will output png files by default
 python GCI.py -r ref.fa --hifi hifi.bam hifi.paf --nano ont.bam ont.paf -d mat -o mat -p -it pdf ...
 ```
