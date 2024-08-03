@@ -21,6 +21,7 @@ Genome Continuity Inspector (GCI) is an assembly assessment tool for high-qualit
 - [canu](https://github.com/marbl/canu) (for trio-binning)
 - [minimap2](https://github.com/lh3/minimap2) (for mapping)
 - [winnowmap](https://github.com/marbl/Winnowmap) (for mapping)
+- [veritymap](https://github.com/ablab/VerityMap) (for mapping)
 - [samtools](https://github.com/samtools/samtools) (for sam/bam processing)
 - [paftools.js](https://github.com/lh3/minimap2/blob/master/misc/paftools.js) (for converting sam to paf)
 
@@ -192,14 +193,12 @@ python GCI.py -r example/MH63.fasta \
 
 
 ### Benchmark
-We benchmarked GCI in many genomes (details seen in [citation](https://github.com/yeeus/GCI#citation)):
+We benchmarked GCI in many genomes (details in folder [benchmark](https://github.com/yeeus/GCI/tree/main/benchmark) and [citation](https://github.com/yeeus/GCI#citation)):
 | Type of reads                |  CHM13.v.2.0   | CN1.mat.v0.9  | CN1.pat.v0.9  | HG002.mat.cur.20211005 | HG002.pat.cur.20211005 | GGswu          | Col-CEN.v1.2   | MH63RS3       |
 | :--------------------------: | :----------:   | :----------:  | :----------:  | :--------------------: | :--------------------: | :---:          | :----------:   | :-----:       |
 | HiFi (depth; GCI)            | ~58x; 41.8259  | ~44x; 22.8391 | ~44x; 22.4743 | ~83x; 7.2645           | ~83x; 11.9397          | ~51x; 7.9901   | ~90x; 30.7545  | ~39x; 49.8945 | 
 | Nano (depth; GCI)            | ~134x; 87.0425 | ~39x; 51.5398 | ~39x; 63.0391 | ~257x; 18.3920         | ~257x; 27.1588         | ~103x; 30.4181 | ~480x; 99.9999 |       NA      | 
 | HiFi + Nano                  | 87.0425        | 66.7940       | 77.8956       | 18.7177                | 27.7796                | 29.3659        | 99.9999        |       NA      | 
-| RAM (Gb)                     | 74.25          | NA            | NA            | NA                     | NA                     | NA             | 14.10          |     4.58      | 
-| User time                    | 6.03h          | NA            | NA            | NA                     | NA                     | NA             | 22.74m         |     9.46m     | 
 
 *Note: all the results are computed using one bam file from winnowmap and one paf file from minimap2 which would be sightly higher than all bams*
 
