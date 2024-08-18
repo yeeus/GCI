@@ -8,7 +8,8 @@ Genome Continuity Inspector (GCI) is an assembly assessment tool for high-qualit
 ## Contents
 - [Requirements](https://github.com/yeeus/GCI#requirements)
 - [Parameters](https://github.com/yeeus/GCI#parameters)
-- [Usage](https://github.com/yeeus/GCI#usage) 
+- [Usage](https://github.com/yeeus/GCI#usage)
+- [Test data](https://github.com/yeeus/GCI#Test-data)  
 - [Outputs](https://github.com/yeeus/GCI#outputs)
 - [Benchmark](https://github.com/yeeus/GCI#benchmark)
 - [Utility](https://github.com/yeeus/GCI#utility)
@@ -143,7 +144,7 @@ We recommend to input only one alignment file per software (minimap2 and winnowm
 python GCI.py -r ref.fa --hifi hifi.bam hifi.paf --nano ont.bam ont.paf -d mat -o mat -p -it pdf ...
 ```
 
-4. Running GCI with test files
+### Test data
 
 You can first download the test files from [zenodo](https://zenodo.org/records/12748594)
 ```
