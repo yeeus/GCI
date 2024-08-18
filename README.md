@@ -13,6 +13,7 @@ Genome Continuity Inspector (GCI) is an assembly assessment tool for high-qualit
 - [Outputs](https://github.com/yeeus/GCI#outputs)
 - [Benchmark](https://github.com/yeeus/GCI#benchmark)
 - [Utility](https://github.com/yeeus/GCI#utility)
+- [FAQ](https://github.com/yeeus/GCI#Frequently-asked-questions)
 - [Citation](https://github.com/yeeus/GCI#citation)
 - [Help](https://github.com/yeeus/GCI#help)
 - [To do](https://github.com/yeeus/GCI#to-do)
@@ -271,6 +272,9 @@ We benchmarked GCI in many genomes (details in folder [benchmark](https://github
     python convert_samtools_depth.py $samtools_depth_file output_refix
     ```
     > This will generate $output_prefix.depth.gz which can be used for `plot_depth.py`
+
+### Frequently asked questions
+
 
 
 ### Citation
