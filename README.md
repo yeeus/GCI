@@ -135,7 +135,6 @@ paftools.js sam2paf ${mat.winnowmap.hifi.sam} | sort -k6,6V -k8,8n > ${mat.winno
 3. Filter the mapping files and get the genome continuity index
 
 We recommend to input only one alignment file per software (minimap2 and winnowmap) using the same set of long reads. 
-
 **Importantly,** GCI needs at least one bam file for one type of long reads, which means you'll get errors when providing only paf files.
 ```
 # Before this, make sure you've generated the index file (.bai) for bam files
@@ -199,8 +198,8 @@ We benchmarked GCI in many genomes (details in folder [benchmark](https://github
 | Type of reads                |  CHM13.v.2.0   | CN1.mat.v0.9  | CN1.pat.v0.9  | HG002.mat.cur.20211005 | HG002.pat.cur.20211005 | GGswu          | Col-CEN.v1.2   | MH63RS3       |
 | :--------------------------: | :----------:   | :----------:  | :----------:  | :--------------------: | :--------------------: | :---:          | :----------:   | :-----:       |
 | HiFi (depth; GCI)            | ~58x; 41.8259  | ~44x; 22.8391 | ~44x; 22.4743 | ~83x; 7.2645           | ~83x; 11.9397          | ~51x; 7.9901   | ~90x; 30.7545  | ~39x; 49.8945 | 
-| Nano (depth; GCI)            | ~134x; 87.0425 | ~39x; 51.5398 | ~39x; 63.0391 | ~257x; 18.3920         | ~257x; 27.1588         | ~103x; 30.4181 | ~480x; 99.9999 |       NA      | 
-| HiFi + Nano                  | 87.0425        | 66.7940       | 77.8956       | 18.7177                | 27.7796                | 29.3659        | 99.9999        |       NA      | 
+| ONT (depth; GCI)             | ~134x; 87.0425 | ~39x; 51.5398 | ~39x; 63.0391 | ~257x; 18.3920         | ~257x; 27.1588         | ~103x; 30.4181 | ~480x; 99.9999 |       NA      | 
+| HiFi + ONT                   | 87.0425        | 66.7940       | 77.8956       | 18.7177                | 27.7796                | 29.3659        | 99.9999        |       NA      | 
 
 *Note: all the results are computed using one bam file from winnowmap and one paf file from minimap2 which would be sightly higher than all bams*
 
@@ -273,7 +272,46 @@ We benchmarked GCI in many genomes (details in folder [benchmark](https://github
     ```
     > This will generate $output_prefix.depth.gz which can be used for `plot_depth.py`
 
+
+
 ### Frequently asked questions
+**1. The rationale behind the GCI score needs to be better explained. In particular, why is it based on logarithms? Why is the numerator based on N50, a single point on the Nx step plot, rather than on a more stable cumulative auN/E-size?**
+
+Compared to contig N50, GCI incorporates both contig size distribution (N50) and the number of contigs. For nearly T2T genome assemblies, where contig N50 values usually reach saturation, the number of contigs which reflect the number of remaining gaps, becomes a critical factor in determining assembly continuity. However, the influence of the number of contigs on whole-genome continuity can sometimes be exaggerated due to the presence of numerous tiny contigs in practice. To address this, GCI uses a logarithmic transformation to mitigate the inflation of the effect caused by tiny contigs. Similarly, adjacent gaps revealed by curated mapping depth are merged when calculating GCI scores to further avoid inflation.
+
+Regarding the choice of N50 over auN, contig N50 is a well-established and widely recognized metric for assessing genome assembly continuity. Although auN/E-size provides valuable insight into assembly continuity, our analysis has shown that auN/E-size is highly correlated with N50, as demonstrated by both real and simulated data (Fig. 2 in paper). To quantify the difference between N50 and auN/E-size in GCI scoring, we calculated the GCI scores of several genome assemblies using both N50 and auN/E-size, and observed that the results were similar (sheet 1 of [benchmark/supplementary_tables.xlsx](https://github.com/yeeus/GCI/blob/main/benchmark/supplementary_tables.xlsx)).
+
+
+**2. The authors suggest using at least two aligners out of minimap2, Winnowmap2, and VerityMap. However, the latter one was not used in the paper or on GitHub examples. Is something wrong with it, or wasn't it tested?**
+
+Sorry for the confusion. VerityMap (abbreviated as VM) was designed for mapping long reads to assemblies with extra-long tandem repeats (Mikheenko et al., 2020, Bioinformatics), and similarly Winnowmap2 (WM2) was specially optimized for mapping long reads to repetitive reference sequences (Jain et al., 2020, Nat Methods). Compared to minimap2 (MM2), VerityMap and Winnowmap2 are both specially developed for complex regions. We tested and compared the performance of aligner VerityMap compared to minimap2 and Winnomap2, using rice assembly MH63 as instance. We mapped HiFi reads against the assembly and observed that VerityMap (4.5h) took more running time than Winnowmap2 (3.07h, including the k-mer library building using meryl) and minimap2 (0.17h). Using alignments from any two of the three tools, we ran the GCI workflow. WM2+MM2 and VM+MM2 yielded similar potential assembly issues and GCI scores, while WM2+VM detected fewer issues with a higher GCI score. Therefore, the combination between WM2 and MM2 is recommended. See details in [benchmark/comparing_alignment_tools.pdf](https://github.com/yeeus/GCI/blob/main/benchmark/comparing_alignment_tools.pdf).
+
+
+**3. Figure 1 and the # Depth counting subsection (in the paper) refer to trimming by a single mismatch event (as an example), which is a bit confusing since a single mismatch could be just a tiny sequencing error in the read. Could you explicitly specify how the trimming done in reality?**
+
+Sorry for the confusion. The trimming step involves discarding several bases at both ends of an alignment break when counting the read mapping depth, to remove potentially clipping regions and boundaries, which are often unreliable. GCI focuses on counting only highly confident bases. Compared to traditional depth counting, using curated depth is more accurate and sensitive in detecting potential gaps. As exampled by the third and fourth sites in depth count plot, where curated depths decrease to zero. Although the schematic showed one base being trimmed as example, the trimming length is actually optional and can be specified by users using the parameter `-fl INT`.
+
+
+**4. Nothing is told about the performance of the GCI pipeline (RAM & time requirements). At least raw estimates would be quite beneficial for the future users of the tool.**
+
+We have recorded and updated the computing requirements of GCI for three model genomes (human, Arabidopsis and rice) in sheet 3 of [benchmark/supplementary_tables.xlsx](https://github.com/yeeus/GCI/blob/main/benchmark/supplementary_tables.xlsx). GCI was given one thread in all runs (which will be improved in the future). Note that the runtime only includes running GCI and does not include the computational cost of read mapping.
+
+
+**5. The author mentioned that GCI is a contiguity inspector, which is very confusing and misunderstanding for users. As said, GCI calculates a contiguity score for the correct sequences in T2T-assembly, which is actually a tool for evaluating the correctness of T2T assembly instead of contiguity.**
+
+The primary motivation for developing GCI is to identify gaps in assemblies where read mapping support is insufficient. As you have noticed although a certain amount of genome assemblies are publicly claimed to be gapless and free of “N”s, assembly issues could be still detected upon aligning raw reads. These assembly issues can lead to the break of the continuity. Therefore, you are correct that GCI tool can be used to detect the assembly issues based on the continuity information. However, GCI tool was not designed to rigorously detect all possible assembly errors but has focused on large gaps (at least 10 Kb level, up to the length of sequencing reads), as other small-scale issues like base and structural errors which could be largely resolved by polishing. Actually, GCI is a tool specially developed to evaluate assembly continuity by detecting potential gaps and assembly errors.
+
+
+**6. The performance of GCI need to be tested on the real or synthetic datasets with "ground truth" and the accuracy of detecting misassemblies should be evaluated by some criteria such as precision and recall. Also, the performance of GCI needs to be compared with the state-of-the-art correctness evaluation tools on the datasets with 'ground truth'.**
+
+We agree that benchmarking is essential for evaluating the performance of GCI. To address this, we manually introduced deletions and insertions in the assembly to simulate potential assembly gaps and misjoins. Specifically, we generate pseudo-assemblies by adding different numbers (5, 10, 20) of insertions and deletions in the Col-CEN (v1.2) assembly and detected these simulated assembly issues using GCI and other tools ([CRAQ](https://github.com/JiaoLaboratory/CRAQ) and [T2T-polish](https://github.com/arangrhie/T2T-Polish)). Based on the sequencing length of HiFi and ONT reads and real-life experience with assembly problems, the simulated issue sizes of insertions and deletions were randomly set ranging from 10 Kb to 50 Kb and from 50 Kb to 100 Kb, respectively. The insertion sequences were randomly copied from other genomic regions to simulate duplicates. It should be noted that the loci detected as issues by any of GCI, CRAQ and T2T-polish were excluded in each simulation run, which means that we only simulated issues in the regions verified by all three tools. Five replicates for each simulated issue number were performed and the precision, recall and F1 scores were averaged. Details of the results have been supplemented in the sheet 2 of [benchmark/supplementary_tables.xlsx](https://github.com/yeeus/GCI/blob/main/benchmark/supplementary_tables.xlsx).
+
+Additionally, by detecting simulated issues in the Arabidopsis genome assembly Col-CEN, GCI outperformed the other two tools in precision, recall and F1 score overall. Across the whole genome, GCI achieved comparable precision to T2T-polish and much higher than that of CRAQ. Summarized the results from multiple simulation runs, GCI demonstrated higher recall and F1 scores compared to CRAQ and T2T-polish. Despite the complex regions with highly repetitive sequences showed poorer performance compared to the simple regions across all the three tools, GCI proved to be more robust than both CRAQ and T2T-polish in these challenging regions
+
+
+**7. The misassmblies mostly happen in the repetitive genomic regions. Considering that the performance of GCI is based on the correctness of sequence alignments (with minimap2 and winnowmap) which is difficult on repetitive regions, it's important to test the correctness of GCI on repetitive regions.**
+
+Good point. We evaluated the performance in simple versus complex regions separately. We define the highly repetitive regions (e.g. centromere and rDNA regions) as complex regions. Compared to simple regions, complex regions show lower recall rates but comparable precision rates with GCI. In most simulation cases, GCI outperforms the other two tools in identifying assembly issues in complex regions (see datils in sheet 2 of [benchmark/supplementary_tables.xlsx](https://github.com/yeeus/GCI/blob/main/benchmark/supplementary_tables.xlsx)).
 
 
 
