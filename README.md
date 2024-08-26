@@ -289,6 +289,7 @@ Contig N50 is a well-established and widely recognized metric for assessing geno
 
 VerityMap (abbreviated as VM) was designed for mapping long reads to assemblies with extra-long tandem repeats (Mikheenko et al., 2020, Bioinformatics), and similarly Winnowmap2 (WM2) was specially optimized for mapping long reads to repetitive reference sequences (Jain et al., 2020, Nat Methods). Compared to minimap2 (MM2), VerityMap and Winnowmap2 are both specially developed for complex regions. We tested and compared the performance of aligner VerityMap compared to minimap2 and Winnomap2, using rice assembly MH63 as instance. We mapped HiFi reads against the assembly and observed that VerityMap (4.5h) took more running time than Winnowmap2 (3.07h, including the k-mer library building using meryl) and minimap2 (0.17h). Using alignments from any two of the three tools, we ran the GCI workflow. WM2+MM2 and VM+MM2 yielded similar potential assembly issues and GCI scores, while WM2+VM detected fewer issues with a higher GCI score. Therefore, the combination between WM2 and MM2 is recommended. See details in [benchmark/comparing_alignment_tools.pdf](https://github.com/yeeus/GCI/blob/main/benchmark/comparing_alignment_tools.pdf).
 
+![https://github.com/yeeus/GCI/blob/main/images/mapper.png](VerityMap)
 
 
 **3. How about the performance of the GCI pipeline (RAM & time requirements).**
