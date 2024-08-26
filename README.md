@@ -273,9 +273,9 @@ We benchmarked GCI in many genomes (details in folder [benchmark](https://github
     > This will generate $output_prefix.depth.gz which can be used for `plot_depth.py`
 
 
-
-
-
+ 
+ 
+ 
 ### Frequently asked questions
 
 
@@ -296,8 +296,8 @@ VerityMap (abbreviated as VM) was designed for mapping long reads to assemblies 
 See the computing requirements of GCI for three model genomes (human, Arabidopsis and rice) in sheet 3 of [benchmark/supplementary_tables.xlsx](https://github.com/yeeus/GCI/blob/main/benchmark/supplementary_tables.xlsx).
 GCI was given one thread in all runs (which will be improved in the future). Note that the runtime only includes running GCI and does not include the computational cost of read mapping.
 
-
-
+ 
+ 
 
 ### Citation
 [Chen, Quanyu, et al. "GCI: a continuity inspector for complete genome assembly." bioRxiv (2024): 2024-04.](https://doi.org/10.1101/2024.04.06.588431)
