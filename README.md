@@ -281,21 +281,23 @@ We benchmarked GCI in many genomes (details in folder [benchmark](https://github
 
 **1. Why is the numerator based on N50, a single point on the Nx step plot, rather than on a more stable cumulative auN/E-size?**
 
-Contig N50 is a well-established and widely recognized metric for assessing genome assembly continuity. Although auN/E-size provides valuable insight into assembly continuity, our analysis has shown that auN/E-size is highly correlated with N50, as demonstrated by both real and simulated data (Fig. 2 in paper). We calculated the GCI scores of several genome assemblies using both N50 and auN/E-size, and observed that the results were similar (sheet 1 of [benchmark/supplementary_tables.xlsx](https://github.com/yeeus/GCI/blob/main/benchmark/supplementary_tables.xlsx)).
+Contig N50 is a well-established and widely recognized metric for assessing genome assembly continuity. Although auN/E-size provides valuable insight into assembly continuity, our analysis has shown that auN/E-size is highly correlated with N50, as demonstrated by both real and simulated data (Fig. 2 in paper). We calculated the GCI scores of several genome assemblies using both N50 and auN/E-size, and observed that the results were similar.
 
+![https://github.com/yeeus/GCI/blob/main/images/N50-auN.png](https://github.com/yeeus/GCI/blob/main/images/N50-auN.png)
 
 
 **2. How to select two aligners? Compared to minimap2 and Winnowmap2, does VerityMap work ?**
 
-VerityMap (abbreviated as VM) was designed for mapping long reads to assemblies with extra-long tandem repeats (Mikheenko et al., 2020, Bioinformatics), and similarly Winnowmap2 (WM2) was specially optimized for mapping long reads to repetitive reference sequences (Jain et al., 2020, Nat Methods). Compared to minimap2 (MM2), VerityMap and Winnowmap2 are both specially developed for complex regions. We tested and compared the performance of aligner VerityMap compared to minimap2 and Winnomap2, using rice assembly MH63 as instance. We mapped HiFi reads against the assembly and observed that VerityMap (4.5h) took more running time than Winnowmap2 (3.07h, including the k-mer library building using meryl) and minimap2 (0.17h). Using alignments from any two of the three tools, we ran the GCI workflow. WM2+MM2 and VM+MM2 yielded similar potential assembly issues and GCI scores, while WM2+VM detected fewer issues with a higher GCI score. Therefore, the combination between WM2 and MM2 is recommended. See details in [benchmark/comparing_alignment_tools.pdf](https://github.com/yeeus/GCI/blob/main/benchmark/comparing_alignment_tools.pdf).
+VerityMap (abbreviated as VM) was designed for mapping long reads to assemblies with extra-long tandem repeats (Mikheenko et al., 2020, Bioinformatics), and similarly Winnowmap2 (WM2) was specially optimized for mapping long reads to repetitive reference sequences (Jain et al., 2020, Nat Methods). Compared to minimap2 (MM2), VerityMap and Winnowmap2 are both specially developed for complex regions. We tested and compared the performance of aligner VerityMap compared to minimap2 and Winnomap2, using rice assembly MH63 as instance. We mapped HiFi reads against the assembly and observed that VerityMap (4.5h) took more running time than Winnowmap2 (3.07h, including the k-mer library building using meryl) and minimap2 (0.17h). Using alignments from any two of the three tools, we ran the GCI workflow. WM2+MM2 and VM+MM2 yielded similar potential assembly issues and GCI scores, while WM2+VM detected fewer issues with a higher GCI score. Therefore, the combination between WM2 and MM2 is recommended.
 
 ![https://github.com/yeeus/GCI/blob/main/images/mapper.png](https://github.com/yeeus/GCI/blob/main/images/mapper.png)
-
+Potential assembly issues in the rice genome assembly MH63 identified using different aligner combinations among Winnowmap2, minimap2 and VerityMap.
 
 **3. How about the performance of the GCI pipeline (RAM & time requirements).**
 
-See the computing requirements of GCI for three model genomes (human, Arabidopsis and rice) in sheet 3 of [benchmark/supplementary_tables.xlsx](https://github.com/yeeus/GCI/blob/main/benchmark/supplementary_tables.xlsx).
-GCI was given one thread in all runs. Note that the runtime only includes running GCI and does not include the computational cost of read mapping.
+![https://github.com/yeeus/GCI/blob/main/images/RAM.png](https://github.com/yeeus/GCI/blob/main/images/RAM.png)
+
+Note: GCI was given one thread in all runs. Note that the runtime only includes running GCI and does not include the computational cost of read mapping.
   
   
  
