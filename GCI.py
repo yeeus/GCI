@@ -1038,7 +1038,7 @@ if __name__=='__main__':
     group_io.add_argument('-R', '--regions', metavar='FILE', help='Bed file containing regions\nBe cautious! If both specify `--chrs` and `--regions`, chromosomes in regions bed file should be included in the chromosomes list')
     group_io.add_argument('-ts', '--threshold', metavar='INT', type=int, help='The threshold of depth to be reported as issues [0]', default=0)
     group_io.add_argument('-dp', '--dist-percent', metavar='FLOAT', type=float, help='The distance between the candidate gap intervals for combining in chromosome units [0.005]', default=0.005)
-    group_io.add_argument('-t', '--threads', type=int, help='Number of threads [1]', default=1)
+    group_io.add_argument('-t', '--threads', metavar='INT', type=int, help='Number of threads [1]', default=1)
     group_io.add_argument('-d', dest='directory', metavar='PATH', help='The directory of output files [.]', default='.')
     group_io.add_argument('-o', '--output', dest='prefix', metavar='STR', help='Prefix of output files [GCI]', default='GCI')
 
