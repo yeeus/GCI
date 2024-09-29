@@ -297,7 +297,7 @@
 
   **3. How about the performance of the GCI pipeline (RAM & time requirements).**
 
-  ![https://github.com/yeeus/GCI/blob/main/images/RAM.png](https://github.com/yeeus/GCI/blob/main/images/RAM.png)
+  ![https://github.com/yeeus/GCI/blob/main/images/RAM.png](https://github.com/yeeus/GCI/blob/main/images/RAM_v2.png)
 
   Note: Although I used 32 threads to run GCI, fewer threads like 16 are enough after some tests.
     
