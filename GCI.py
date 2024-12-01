@@ -149,7 +149,11 @@ def read_sam(args):
     tmp_high_qual_querys = set()
     with pysam.AlignmentFile(file, 'rb', threads=threads) as samfile:
         for segment in samfile.fetch(contig=target, start=lft, stop=rgh, multiple_iterators=True):
-            if (segment.is_mapped == True) and (segment.is_secondary == False) and (segment.is_supplementary == False) and (segment.mapping_quality >= map_qual):
+            try:
+                flag1 = segment.is_mapped
+            except AttributeError:
+                flag1 = not segment.is_unmapped
+            if (flag1 == True) and (segment.is_secondary == False) and (segment.is_supplementary == False) and (segment.mapping_quality >= map_qual):
                 M = segment.get_cigar_stats()[0][0]
                 I = segment.get_cigar_stats()[0][1]
                 D = segment.get_cigar_stats()[0][2]
