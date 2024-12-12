@@ -29,8 +29,8 @@
 
   As for **GCI**, it requires:
   - **python3.x** (tested in python3.10)
-  - pysam (stable version)
-  - biopython (stable version)
+  - [pysam](https://github.com/pysam-developers/pysam) (stable version)
+  - [biopython](https://github.com/biopython/biopython) (stable version)
   - numpy (stable version)
   - matplotlib (stable version)
   - [bamsnap](https://github.com/yeeus/bamsnap) (for plotting in utility `filter_bam.py`)
@@ -197,11 +197,11 @@
 
   ### Benchmark
   We benchmarked GCI in many genomes (details in folder [benchmark](https://github.com/yeeus/GCI/tree/main/benchmark) and [citation](https://github.com/yeeus/GCI#citation)):
-  | Type of reads                |  CHM13.v.2.0   | CN1.mat.v0.9  | CN1.pat.v0.9  | HG002.mat.cur.20211005 | HG002.pat.cur.20211005 | GGswu          | Col-CEN.v1.2   | MH63RS3       |
-  | :--------------------------: | :----------:   | :----------:  | :----------:  | :--------------------: | :--------------------: | :---:          | :----------:   | :-----:       |
-  | HiFi (depth; GCI)            | ~58x; 41.8259  | ~44x; 22.8391 | ~44x; 22.4743 | ~83x; 7.2645           | ~83x; 11.9397          | ~51x; 7.9901   | ~90x; 30.7545  | ~39x; 49.8945 | 
-  | ONT (depth; GCI)             | ~134x; 87.0425 | ~39x; 51.5398 | ~39x; 63.0391 | ~257x; 18.3920         | ~257x; 27.1588         | ~103x; 30.4181 | ~480x; 99.9999 |       NA      | 
-  | HiFi + ONT                   | 87.0425        | 66.7940       | 77.8956       | 18.7177                | 27.7796                | 29.3659        | 99.9999        |       NA      | 
+  | Type of reads                |  [CHM13.v.2.0](https://github.com/marbl/CHM13)   | [CN1.mat.v0.9](https://github.com/T2T-CN1/CN1)  | [CN1.pat.v0.9](https://github.com/T2T-CN1/CN1)  | [HG002.mat.cur.20211005](https://github.com/human-pangenomics/HG002_Data_Freeze_v1.0) | [HG002.pat.cur.20211005](https://github.com/human-pangenomics/HG002_Data_Freeze_v1.0) | [MFA8](https://github.com/zhang-shilong/T2T-MFA8) | [GGswu](https://github.com/lurebgi/chicken-T2T)         | [Col-CEN.v1.2](https://github.com/schatzlab/Col-CEN)   | [MH63RS3](http://rice.hzau.edu.cn/rice_rs3/)       |
+  | :--------------------------: | :----------:   | :----------:  | :----------:  | :--------------------: | :--------------------: | :---: | :---:          | :----------:   | :-----:       |
+  | HiFi (depth; GCI)            | ~58x; 41.8259  | ~44x; 22.8391 | ~44x; 22.4743 | ~83x; 7.2645           | ~83x; 11.9397          |   ~53x; 44.9517    | ~51x; 7.9901   | ~90x; 30.7545  | ~39x; 49.8945 | 
+  | ONT (depth; GCI)             | ~134x; 87.0425 | ~39x; 51.5398 | ~39x; 63.0391 | ~257x; 18.3920         | ~257x; 27.1588         |   ~77x; 79.1362   | ~103x; 30.4181 | ~480x; 99.9999 |       NA      | 
+  | HiFi + ONT                   | 87.0425        | 66.7940       | 77.8956       | 18.7177                | 27.7796                |    79.1383   | 29.3659        | 99.9999        |       NA      | 
 
   *Note: all the results are computed using one bam file from winnowmap and one paf file from minimap2 which would be sightly higher than all bams*
 
@@ -305,7 +305,7 @@
   
 
   ### Citation
-  [Chen, Quanyu, et al. "GCI: a continuity inspector for complete genome assembly." bioRxiv (2024): 2024-04.](https://doi.org/10.1101/2024.04.06.588431)
+  [Chen, Quanyu, et al. "GCI: a continuity inspector for complete genome assembly." Bioinformatics 40.11 (2024): btae633.](https://doi.org/10.1093/bioinformatics/btae633)
 
   ### Help
   If you get any problems, please raise an [issue](https://github.com/yeeus/GCI/issues) first.
