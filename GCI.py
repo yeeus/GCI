@@ -158,9 +158,11 @@ def read_sam(args):
                 I = segment.get_cigar_stats()[0][1]
                 D = segment.get_cigar_stats()[0][2]
                 S = segment.get_cigar_stats()[0][4]
+                eq = segment.get_cigar_stats()[0][7]
+                X = segment.get_cigar_stats()[0][8]
                 NM = segment.get_tag('NM')
                 mm = NM - (I + D)
-                if (S/(M+I+S) <= clip_percent) and ((M-mm)/(M+I+D) >= iden_percent):
+                if (S/(M+eq+X+I+S) <= clip_percent) and ((M+eq+X-mm)/(M+eq+X+I+D) >= iden_percent):
                     tmp_samfile_dict[segment.query_name] = (segment.reference_name, segment.reference_start, segment.reference_end, segment.query_length)
                     if segment.mapping_quality >= mq_cutoff:
                         tmp_high_qual_querys.add(segment.query_name)
