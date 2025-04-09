@@ -35,6 +35,11 @@
   - matplotlib (stable version)
   - [bamsnap](https://github.com/yeeus/bamsnap) (for plotting in utility `filter_bam.py`)
 
+  #### Bioconda
+  Thanks to [@SwiftSeal](https://github.com/SwiftSeal), now you can install GCI with bioconda.
+  ```
+  conda install bioconda::gci
+  ```
 
   ### Parameters
   ```
