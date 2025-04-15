@@ -135,7 +135,7 @@
   meryl print greater-than distinct=0.9998 $mat_merylDB > $mat_repetitive_k15.txt
   winnowmap -W $mat_repetitive_k15.txt -ax map-pb $mat_asm $mat_hifi > ${mat.winnowmap.hifi.sam}
   samtools view -@ $threads -Sb ${mat.winnowmap.hifi.sam} | samtools sort -@ $threads -o ${mat.winnowmap.hifi.bam}
-  samtools index ${mat.minimap2.hifi.bam}
+  samtools index ${mat.winnowmap.hifi.bam}
   paftools.js sam2paf ${mat.winnowmap.hifi.sam} | sort -k6,6V -k8,8n > ${mat.winnowmap.hifi.paf}
   ```
 
