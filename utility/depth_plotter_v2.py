@@ -637,7 +637,7 @@ class DepthPlotter:
         """creat legend"""
         legend_elements = []
 
-        for data_type, data in processed_data.~/Desktop/Work/Software/github/GCI/utility/depth_plotter_v2.pyitems():
+        for data_type, data in processed_data.items():
             color = data['processor'].color
             label = 'HiFi' if data_type == 'hifi' else 'ONT'
             legend_elements.append(plt.Rectangle((0, 0), 1, 1, facecolor=color, alpha=0.8, label=label))
