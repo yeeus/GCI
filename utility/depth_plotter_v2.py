@@ -627,17 +627,17 @@ class DepthPlotter:
 
             for start, end in region_list:
                 if positive:
-                    ax.axvspan(start, end, ymin=0.0, ymax=1.0,
-                              color=color_value, alpha=0.8)
+                    ax.axvspan(start, end, ymin=0.5, ymax=0.95,
+                               color=color_value, alpha=0.8)
                 else:
-                    ax.axvspan(start, end, ymin=0.0, ymax=1.0,
-                              color=color_value, alpha=1.0)
+                    ax.axvspan(start, end, ymin=0.05, ymax=0.5,
+                               color=color_value, alpha=0.8)
 
     def _create_legend(self, ax, processed_data, plot_mode):
         """creat legend"""
         legend_elements = []
 
-        for data_type, data in processed_data.items():
+        for data_type, data in processed_data.~/Desktop/Work/Software/github/GCI/utility/depth_plotter_v2.pyitems():
             color = data['processor'].color
             label = 'HiFi' if data_type == 'hifi' else 'ONT'
             legend_elements.append(plt.Rectangle((0, 0), 1, 1, facecolor=color, alpha=0.8, label=label))
