@@ -570,19 +570,19 @@ class DepthPlotter:
         # for hifi, positive
         if 'hifi' in processed_data:
             data = processed_data['hifi']
-            self._plot_windowed_data(ax, data, positive=True)
             self._plot_depth_regions(ax, data['regions'], positive=True)
+            self._plot_windowed_data(ax, data, positive=True)
 
         # for ont, negative
         if 'ont' in processed_data:
             data = processed_data['ont']
-            self._plot_windowed_data(ax, data, positive=False)
             self._plot_depth_regions(ax, data['regions'], positive=False)
+            self._plot_windowed_data(ax, data, positive=False)
 
     def _plot_single_data(self, ax, data, seq_length):
         """plot one dateset"""
-        self._plot_windowed_data(ax, data, positive=True)
         self._plot_depth_regions(ax, data['regions'], positive=True)
+        self._plot_windowed_data(ax, data, positive=True)
 
     def _plot_windowed_data(self, ax, data, positive=True):
         """plot windows data"""
