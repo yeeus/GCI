@@ -341,8 +341,8 @@ def plot_base(depths_list=[], target=None, averaged_dicts=[], mean_depths=[], y_
         plt.savefig(f'{directory}/{prefix}.{target}:{start}-{end}.{image_type}', dpi=200)
     plt.close()
 
-    
-def plot_depth(depths_list=[], depth_min=0.1, depth_max=4.0, window_size=50000, image_type='png', directory='.', prefix='GCI', force=False, targets_length={}, dist_percent=0.005, regions_bed={}, threshold=0):
+
+def plot_depth(depths_list=[], depth_min=0.1, depth_max=4.0, window_size=50000, image_type='png', directory='.', prefix='GCI', force=False, targets_length={}, dist_percent=0.005, regions_bed={}, threshold=0, depth_mean=None):
     """
     usage: plot whole genome depth
 
@@ -366,13 +366,15 @@ def plot_depth(depths_list=[], depth_min=0.1, depth_max=4.0, window_size=50000, 
     else:
         sys.exit(f'ERROR!!! The format of output images only supports pdf and png')
     
-    
-    mean_depths = []
-    for depthss in depths_list:
-        sum_depths = []
-        for depths in depthss.values():
-            sum_depths = np.concatenate((sum_depths, depths))
-        mean_depths.append(np.mean(sum_depths))
+    if depth_mean != None:
+        mean_depths = depth_mean
+    else:
+        mean_depths = []
+        for depthss in depths_list:
+            sum_depths = []
+            for depths in depthss.values():
+                sum_depths = np.concatenate((sum_depths, depths))
+            mean_depths.append(np.mean(sum_depths))
     max_depths = [mean_depth * depth_max for mean_depth in mean_depths]
     
     
@@ -404,7 +406,7 @@ def plot_depth(depths_list=[], depth_min=0.1, depth_max=4.0, window_size=50000, 
         print(f'Plotting depth for regions done!!!\n\n')
 
 
-def preprocessing(reference=None, hifi=None, nano=None, directory='.', prefix='GCI', depth_min=0.1, depth_max=4.0, window_size=50000, image_type='png', force=False, regions=None, dist_percent=0.005, threshold=0):
+def preprocessing(reference=None, hifi=None, nano=None, directory='.', prefix='GCI', depth_min=0.1, depth_max=4.0, window_size=50000, image_type='png', force=False, regions=None, dist_percent=0.005, threshold=0, depth_mean=None):
     if directory.endswith('/'):
         directory = '/'.join(directory.split('/')[:-1])
     if os.path.exists(directory):
@@ -445,6 +447,10 @@ def preprocessing(reference=None, hifi=None, nano=None, directory='.', prefix='G
                 sys.exit('ERROR!!! The targets in ont depth file are inconsistent with the reference file\nPlease check both ont depth file and the reference')
         nano_depths = merge_gaps_depths(nano_depths, Ns_bed)
     
+    depth_mean = [float(i) for i in depth_mean.split(',')]
+    if len(depth_mean) != (hifi != None) + (nano != None):
+        sys.exit('ERROR!!! The number of mean depths is not equal to that of depth files\nPlease check the input mean depths')
+    
     regions_bed = {}
     if regions != None:
         if os.path.exists(regions) and os.access(regions, os.R_OK):
@@ -463,9 +469,9 @@ def preprocessing(reference=None, hifi=None, nano=None, directory='.', prefix='G
     
     
     if nano == None:
-        plot_depth([hifi_depths], depth_min, depth_max, window_size, image_type, directory, prefix, force, hifi_targets_length, dist_percent, regions_bed, threshold)
+        plot_depth([hifi_depths], depth_min, depth_max, window_size, image_type, directory, prefix, force, hifi_targets_length, dist_percent, regions_bed, threshold, depth_mean)
     elif hifi == None:
-        plot_depth([nano_depths], depth_min, depth_max, window_size, image_type, directory, prefix, force, nano_targets_length, dist_percent, regions_bed, threshold)
+        plot_depth([nano_depths], depth_min, depth_max, window_size, image_type, directory, prefix, force, nano_targets_length, dist_percent, regions_bed, threshold, depth_mean)
     else:
         if set(hifi_targets_length.keys()) != set(nano_targets_length.keys()):
             sys.exit(f'ERROR!!! The targets in hifi and nano alignment files are inconsistent\nPlease check the reference used in mapping both hifi and ont reads')
@@ -473,7 +479,7 @@ def preprocessing(reference=None, hifi=None, nano=None, directory='.', prefix='G
             for target, length in hifi_targets_length.items():
                 if length != nano_targets_length[target]:
                     sys.exit(f'ERROR!!! The element "{target}:{length}" in hifi is inconsistent with that in ont depth file which is "{target}:{nano_targets_length[target]}"\nPlease check both depth files')
-        plot_depth([hifi_depths, nano_depths], depth_min, depth_max, window_size, image_type, directory, prefix, force, hifi_targets_length, dist_percent, regions_bed, threshold)
+        plot_depth([hifi_depths, nano_depths], depth_min, depth_max, window_size, image_type, directory, prefix, force, hifi_targets_length, dist_percent, regions_bed, threshold, depth_mean)
 
 
 if __name__=='__main__':
@@ -488,6 +494,7 @@ if __name__=='__main__':
 
     group_po = parser.add_argument_group("Plot Options")
     group_po.add_argument('-R', '--regions', metavar='FILE', help='Bed file containing regions to plot')
+    group_po.add_argument('-dmean', '--depth-mean', metavar='STR', help='Comma delimited mean depth. Needed when only regions plotted having depth')
     group_po.add_argument('-ts', '--threshold', metavar='INT', type=int, help='The threshold of depth used in GCI.py [0]', default=0)
     group_po.add_argument('-dmin', '--depth-min', metavar='FLOAT', type=float, help='Minimum depth in folds of mean coverage for plotting [0.1]', default=0.1)
     group_po.add_argument('-dmax', '--depth-max', metavar='FLOAT', type=float, help='Maximum depth in folds of mean coverage for plotting [4.0]', default=4.0)
