@@ -20,10 +20,11 @@
 
   ### Requirements
 
-  - [canu](https://github.com/marbl/canu) (for trio-binning)
-  - [minimap2](https://github.com/lh3/minimap2) (for mapping)
-  - [winnowmap](https://github.com/marbl/Winnowmap) (for mapping)
-  - [veritymap](https://github.com/ablab/VerityMap) (for mapping)
+  - [canu](https://github.com/marbl/canu) (optional, but wanted for trio-binning long reads)
+  - [seqkit](https://github.com/shenwei356/seqkit) (optional, but wanted for trio-binning long reads, if phased by HiC)
+  - [minimap2](https://github.com/lh3/minimap2) (optional, but wanted for mapping)
+  - [winnowmap](https://github.com/marbl/Winnowmap) (optional, but wanted for mapping)
+  - [veritymap](https://github.com/ablab/VerityMap) (optional, for mapping)
   - [samtools](https://github.com/samtools/samtools) (for sam/bam processing)
   - [paftools.js](https://github.com/lh3/minimap2/blob/master/misc/paftools.js) (for converting sam to paf)
 
@@ -33,16 +34,16 @@
   - [biopython](https://github.com/biopython/biopython) (stable version)
   - numpy (stable version)
   - matplotlib (stable version)
-  - [bamsnap](https://github.com/yeeus/bamsnap) (for plotting in utility `filter_bam.py`)
+  - [bamsnap](https://github.com/yeeus/bamsnap) (optional, for plotting in utility `filter_bam.py`)
 
   #### Bioconda
   Thanks to [@SwiftSeal](https://github.com/SwiftSeal), now you can install GCI with bioconda.
-  ```
+  ```bash
   conda install bioconda::gci
   ```
 
   ### Parameters
-  ```
+  ```bash
   python GCI.py --help
 
   usage: GCI.py [-r FILE] [--hifi  [...]] [--nano  [...]] [--chrs] [-R FILE] [-ts INT] [-dp FLOAT] [-t INT] [-d PATH] [-o STR] [-mq INT] [--mq-cutoff INT] [-ip FLOAT] [-op FLOAT]
@@ -103,9 +104,9 @@
   ```
 
   ### Usage
-  1. **(For haplotype-resolved genome)** Prepare parental (specific) reads (if parental sequencing data are available, please skip this step) 
-  ```
-  # we recommend to use canu for binning
+  1. **(For haplotype-resolved genome)** Prepare trio-binned HiFi / ONT reads (if parental HiFi / ONT sequencing data are available, please skip this step) 
+  ```bash
+  # we recommend using canu for trio-binning if parental NGS reads are available
   canu -haplotype \
       -p $prefix -d $dictionary \
       genomeSize=3g \
@@ -115,13 +116,23 @@
       -pacbio-hifi $hifi \   ## binning ONT reads with -nanopore $ont
       useGrid=false
 
-  # because there would be unknown reads which could't be reliably binned, we suggest to combine them with haplotype-specific reads
+  # because there would be unknown reads that couldn't be reliably binned, we suggest combining them with binned reads
   cat ${canu_mat.fa.gz} ${canu_unknown.fa.gz} > ${canu_mat.final.fa.gz}
   cat ${canu_pat.fa.gz} ${canu_unknown.fa.gz} > ${canu_pat.final.fa.gz}
+
+
+  # If parental NGS reads are not accessible (e.g., the genome was phased by HiC), one can map HiFi / ONT reads to combined genomes to select the primary (& supplementary) alignments,
+  # which could be used for downstream analysis
+  minimap2 -t $threads -ax map-hifi <(cat $hap1_asm $hap2_asm) $hifi > minimap2.hifi.sam
+  paftools.js sam2paf -p minimap2.hifi.sam | cut -f 1,6 > minimap2.hifi.list
+  for hap in hap1 hap2; do
+    grep "$hap" minimap2.hifi.list | cut -f1 > minimap2.hifi.$hap.list
+    seqkit grep -f minimap2.hifi.$hap.list $hifi -o hifi.$hap.fq
+  done
   ```
 
   2. Map HiFi and/or ONT reads to assemblies (using minimap2 and winnowmap)
-  ```
+  ```bash
   # minimap2 
   minimap2 -t $threads -ax map-hifi $mat_asm $mat_hifi > ${mat.minimap2.hifi.sam}   ## mapping ONT reads with -ax map-ont
   samtools view -@ $threads -Sb ${mat.minimap2.hifi.sam} | samtools sort -@ $threads -o ${mat.minimap2.hifi.bam}
@@ -143,7 +154,7 @@
 
   We recommend to input only one alignment file per software (minimap2 and winnowmap) using the same set of long reads. 
   **Importantly,** GCI needs at least one bam file for one type of long reads, which means you'll get errors when providing only paf files.
-  ```
+  ```bash
   # Before this, make sure you've generated the index file (.bai) for bam files
   # We recommend to input one bam and one paf file produced by two softwares (for example, one bam file from winnowmap and one paf file from minimap2)
   # which would be theoretically faster and consume less memory but at the cost of lower sensitivity relative to all bams 
@@ -154,7 +165,7 @@
   ### Test data
 
   You can first download the test files from [zenodo](https://zenodo.org/records/12748594)
-  ```
+  ```bash
   tar zxf example.tar.gz
 
   # Then you can run GCI on the test data (it will take some seconds)
@@ -218,12 +229,12 @@
       - Example1
 
         After getting the ${prefix}.${threshold}.depth.bed file, we'd like to get the detailed filtering information. So, we can just extract the alignments in the bed file:
-        ```
+        ```bash
         samtools view -@ $threads -Sb -L ${prefix}.${threshold}.depth.bed ${hifi.bam} > test.bam
         samtools index test.bam
         ```
         Then we can input the bam file with other paf file(s):
-        ```
+        ```bash
         python filter_bam.py test.bam test.paf -d test -o test ## if no prefix provided, the output file would be `test.filter.bam`
         ```
         Finally we would get the filtered bam file `test.bam`. Next, we can visualize the raw and filtered bam files in [IGV](https://github.com/igvteam/igv):
@@ -235,7 +246,7 @@
       - Example2
 
         We can immediately visualize the alignments after getting the filtered file without using IGV. We provide a convenient method for visualizing via [bamsnap](https://github.com/yeeus/bamsnap).
-        ```
+        ```bash
         # first install the prerequisites and bamsnap
         # then we can visualize the alignments in one command
         python filter_bam.py test.bam test.paf -d test -o test -p -ref test.fasta -r chrxxx:xxx-xxx  ## Be cautious, in this case, the filtered file is `test.filter.bam`
@@ -252,7 +263,7 @@
       This script is used for computing GCI score using depth files generated by GCI.py instead of running it again ([#5](https://github.com/yeeus/GCI/issues/5))
       - Example
 
-      ```
+      ```bash
       python GCI_score.py -r ref.fa --hifi hifi.depth.gz --nano nano.depth.gz --two-type two_type.depth.gz  ## `--two-type` is recommended which is used to compute the final score (HiFi + Nano) in GCI.py
       ```
       > Feel free to compute score for regions ([#5](https://github.com/yeeus/GCI/issues/5)) or specific chromosomes ([#3](https://github.com/yeeus/GCI/issues/3)) as in GCI.py
@@ -261,17 +272,21 @@
     - Usage
       
       This script is used to generate the depth plot as a stand-alone function ([#1](https://github.com/yeeus/GCI/issues/1)) and pdf is recommended.
+
+
+      **This is very useful when a manual check is needed, such as to verify assembly quality in complex regions.**
+      When used for this object, one should check both the original reads mapping depth plot and GCI curated depth plot, while the latter usually generates a lower depth in complex regions.
       - Example
       
-      ```
-      python plot_depth.py -r ref.fasta --hifi hifi.depth.gz --nano nano.depth.gz -it pdf
+      ```bash
+      python plot_depth.py -r ref.fasta --hifi hifi.depth.gz --nano nano.depth.gz -R region.bed -it pdf
       ```
       > Unlike GCI.py, this script will output plots only for regions ([#5](https://github.com/yeeus/GCI/issues/5)).
 
   - convert_samtools_depth.py
     - Usage
 
-      This script is used for converting depth file generated by `samtools depth` into the format compatible with `plot_depth.py` ([#6](https://github.com/yeeus/GCI/issues/6))
+      This script is used for converting a depth file generated by `samtools depth` into the format compatible with `plot_depth.py` ([#6](https://github.com/yeeus/GCI/issues/6))
       - Example
 
       ```
