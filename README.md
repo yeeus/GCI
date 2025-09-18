@@ -121,7 +121,8 @@ cat ${canu_mat.fa.gz} ${canu_unknown.fa.gz} > ${canu_mat.final.fa.gz}
 cat ${canu_pat.fa.gz} ${canu_unknown.fa.gz} > ${canu_pat.final.fa.gz}
 
 
-# If parental NGS reads are not accessible (e.g., the genome was phased by HiC), one can map HiFi / ONT reads to combined genomes to select the primary (& supplementary) alignments,
+# If parental NGS reads are not accessible (e.g., the genome was phased by HiC),
+# one can map HiFi / ONT reads to combined genomes to select the primary (& supplementary) alignments,
 # which could be used for downstream analysis
 minimap2 -t $threads -ax map-hifi <(cat $hap1_asm $hap2_asm) $hifi > minimap2.hifi.sam
 paftools.js sam2paf -p minimap2.hifi.sam | cut -f 1,6 > minimap2.hifi.list
