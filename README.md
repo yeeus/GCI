@@ -164,6 +164,8 @@ We recommend to input only one alignment file per software (minimap2 and winnowm
 python GCI.py -r ref.fa --hifi hifi.bam hifi.paf --nano ont.bam ont.paf -t 8 -p -it pdf ...
 ```
 
+*Note: as [#21](https://github.com/yeeus/GCI/issues/21) said, in GCI, `-mq/--map-qual` is not just a “keep more reads → cover more bases” switch. Lowering `-mq` (e.g., to 0) brings in many low-MAPQ alignments, which are typically **multi-mapping reads** from repetitive/low-complexity regions. Therefore, for uniformity analysis, using a strict MQ threshold (e.g., 30-60) is often more interpretable.*
+
 ### Test data
 
 You can first download the test files from [zenodo](https://zenodo.org/records/12748594)
