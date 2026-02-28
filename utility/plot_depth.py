@@ -358,6 +358,7 @@ def plot_depth(depths_list=[], depth_min=0.1, depth_max=4.0, window_size=50000, 
            the percentage of the distance between the gap intervals in the chromosome,
            the regions bed file,
            the threshold of depth
+           the depth_mean setting ('auto' or list of means)
 
     output: the depth plots for whole genome and specific regions
     """
@@ -366,8 +367,21 @@ def plot_depth(depths_list=[], depth_min=0.1, depth_max=4.0, window_size=50000, 
     else:
         sys.exit(f'ERROR!!! The format of output images only supports pdf and png')
     
-    if depth_mean != None:
+    if depth_mean is not None and depth_mean != 'auto':
         mean_depths = depth_mean
+    elif depth_mean == 'auto' and len(regions_bed) > 0:
+        mean_depths = []
+        for depthss in depths_list:
+            sum_depths = []
+            for target, segments in regions_bed.items():
+                if target in depthss:
+                    for segment in segments:
+                        start, end = segment[0], segment[1]
+                        sum_depths = np.concatenate((sum_depths, depthss[target][start:end]))
+            if len(sum_depths) > 0:
+                mean_depths.append(np.mean(sum_depths))
+            else:
+                mean_depths.append(0.0)
     else:
         mean_depths = []
         for depthss in depths_list:
@@ -375,8 +389,8 @@ def plot_depth(depths_list=[], depth_min=0.1, depth_max=4.0, window_size=50000, 
             for depths in depthss.values():
                 sum_depths = np.concatenate((sum_depths, depths))
             mean_depths.append(np.mean(sum_depths))
+            
     max_depths = [mean_depth * depth_max for mean_depth in mean_depths]
-    
     
     if len(regions_bed) == 0:
         for target in depths_list[0].keys():
@@ -417,7 +431,6 @@ def preprocessing(reference=None, hifi=None, nano=None, directory='.', prefix='G
     else:
         os.makedirs(directory)
 
-
     if prefix.endswith('/'):
         sys.exit(f'ERROR!!! The prefix "{prefix}" is not allowed')
     
@@ -447,9 +460,13 @@ def preprocessing(reference=None, hifi=None, nano=None, directory='.', prefix='G
                 sys.exit('ERROR!!! The targets in ont depth file are inconsistent with the reference file\nPlease check both ont depth file and the reference')
         nano_depths = merge_gaps_depths(nano_depths, Ns_bed)
     
-    depth_mean = [float(i) for i in depth_mean.split(',')]
-    if len(depth_mean) != (hifi != None) + (nano != None):
-        sys.exit('ERROR!!! The number of mean depths is not equal to that of depth files\nPlease check the input mean depths')
+    if depth_mean is not None:
+        if depth_mean.lower() == 'auto':
+            depth_mean = 'auto'
+        else:
+            depth_mean = [float(i) for i in depth_mean.split(',')]
+            if len(depth_mean) != (hifi != None) + (nano != None):
+                sys.exit('ERROR!!! The number of mean depths is not equal to that of depth files\nPlease check the input mean depths')
     
     regions_bed = {}
     if regions != None:
@@ -494,7 +511,7 @@ if __name__=='__main__':
 
     group_po = parser.add_argument_group("Plot Options")
     group_po.add_argument('-R', '--regions', metavar='FILE', help='Bed file containing regions to plot')
-    group_po.add_argument('-dmean', '--depth-mean', metavar='STR', help='Comma delimited mean depth. Needed when only regions plotted having depth')
+    group_po.add_argument('-dmean', '--depth-mean', metavar='STR', help='Comma delimited mean depth. Needed when only regions plotted having depth values. Use "auto" to calculate mean from regions automatically.', default=None)
     group_po.add_argument('-ts', '--threshold', metavar='INT', type=int, help='The threshold of depth used in GCI.py [0]', default=0)
     group_po.add_argument('-dmin', '--depth-min', metavar='FLOAT', type=float, help='Minimum depth in folds of mean coverage for plotting [0.1]', default=0.1)
     group_po.add_argument('-dmax', '--depth-max', metavar='FLOAT', type=float, help='Maximum depth in folds of mean coverage for plotting [4.0]', default=4.0)
