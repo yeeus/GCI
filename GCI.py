@@ -126,10 +126,17 @@ def write_depth(directory='.', prefix='GCI', depths={}, threads=1):
             processes.append(mp.Process(target=write_depth_sub, args=(directory, prefix, target, number, lft, min(lft + stp, len(depth_list)), depth_list)))
             lft += stp
             number += 1
-    for process in processes:
-        process.start()
-    for process in processes:
-        process.join()
+
+    # Limit concurrent processes to avoid exhausting file descriptors
+    # when assemblies contain many chromosomes or contigs.
+    for i in range(0, len(processes), threads):
+        batch = processes[i:i + threads]
+        for process in batch:
+            process.start()
+        for process in batch:
+            process.join()
+        for process in batch:
+            process.close()
 
     subprocess.run(f'rm -rf {directory}/{prefix}.depth.gz', shell=True, check=True)
     for target, depth_list in depths.items():
