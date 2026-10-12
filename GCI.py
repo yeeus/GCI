@@ -230,13 +230,14 @@ def filter(paf_files=[], bam_files=[], prefix='GCI', map_qual=30, mq_cutoff=50, 
     return: the whole-genome depth dictionary,
             one dictionary keyed by the targets with the length value
     """
-    if filter_backend == 'partitioned':
+    if filter_backend in ('partitioned', 'partitioned-v2'):
         from gci_partitioned import partitioned_filter
         return partitioned_filter(
             paf_files, bam_files, prefix, map_qual, mq_cutoff, iden_percent,
             clip_percent, ovlp_percent, flank_len, directory, force,
             log_reads_type, chrs_list, threads, scratch_dir, partitions,
-            write_depth
+            write_depth,
+            accumulation='events' if filter_backend == 'partitioned-v2' else 'direct'
         )
     if filter_backend != 'legacy':
         raise ValueError(f'Unknown filter backend: {filter_backend}')
@@ -1165,8 +1166,8 @@ if __name__=='__main__':
     group_io.add_argument('-ts', '--threshold', metavar='INT', type=int, help='The threshold of depth to be reported as issues [0]', default=0)
     group_io.add_argument('-dp', '--dist-percent', metavar='FLOAT', type=float, help='The distance between the candidate gap intervals for combining in chromosome units [0.005]', default=0.005)
     group_io.add_argument('-t', '--threads', metavar='INT', type=int, help='Number of threads [1]', default=1)
-    group_io.add_argument('--filter-backend', choices=['legacy', 'partitioned'], default='legacy',
-                          help='Alignment filtering backend [legacy]; partitioned enables bounded read-name processing')
+    group_io.add_argument('--filter-backend', choices=['legacy', 'partitioned', 'partitioned-v2'], default='legacy',
+                          help='Filtering backend [legacy]; partitioned-v2 adds binary interval and difference-array depth')
     group_io.add_argument('--scratch-dir', default=None, metavar='DIR',
                           help='Temporary partition directory; use node-local scratch (default: system TMPDIR)')
     group_io.add_argument('--partitions', type=int, default=256, metavar='INT',
