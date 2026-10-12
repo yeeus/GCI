@@ -5,6 +5,7 @@ Requires pysam and the same dependencies as GCI.py.
 """
 import gzip
 import os
+import shutil
 import tempfile
 import unittest
 
@@ -105,6 +106,24 @@ class PartitionedBackendTests(unittest.TestCase):
                         gci.collapse_depth_range(legacy, -1, 0, 15),
                         gci.collapse_depth_range(optimized, -1, 0, 15),
                     )
+            # Multiple BAM inputs use the same union/overlap semantics.
+            second_bam = os.path.join(outdir, 'second.bam')
+            shutil.copyfile(bam, second_bam)
+            shutil.copyfile(bam + '.bai', second_bam + '.bai')
+            legacy, _ = gci.filter(
+                paf_files=pafs[:1], bam_files=[bam, second_bam],
+                directory=outdir, prefix='legacy_two_bams',
+                threads=2, flank_len=15,
+            )
+            optimized, _ = gci.filter(
+                paf_files=pafs[:1], bam_files=[bam, second_bam],
+                directory=outdir, prefix='partitioned_two_bams',
+                threads=2, flank_len=15,
+                filter_backend='partitioned',
+                scratch_dir=outdir, partitions=7,
+            )
+            for chrom in legacy:
+                np.testing.assert_array_equal(legacy[chrom], optimized[chrom])
             self.assertFalse(any(name.startswith('gci-part-') for name in os.listdir(outdir)))
 
 
