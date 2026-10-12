@@ -58,6 +58,46 @@ class Phase1PerformanceTests(unittest.TestCase):
         self.assertEqual(merged['chrA'].dtype, np.dtype('uint32'))
         writer.assert_called_once()
 
+    def test_lazy_combined_depth_matches_eager_and_gap_masks(self):
+        hifi = {
+            'chrA': np.array([9, 2, 0, 7, 0, 0, 4, 6], dtype=np.uint32),
+            'chrB': np.arange(33001, dtype=np.uint32) % 7,
+        }
+        nano = {
+            'chrA': np.array([1, 8, 5, 3, 0, 1, 2, 7], dtype=np.uint32),
+            'chrB': np.arange(33001, dtype=np.uint32) % 11,
+        }
+        gaps = {'chrA': [(1, 3)], 'chrB': [(16382, 16390)]}
+        gci.merge_gaps_depths(hifi, gaps)
+        gci.merge_gaps_depths(nano, gaps)
+        with tempfile.TemporaryDirectory() as outdir:
+            lazy = gci.merge_two_type_depth(
+                hifi, nano, prefix='lazy', directory=outdir,
+                threads=4, lazy=True
+            )
+            self.assertNotIsInstance(lazy['chrA'], np.ndarray)
+            for target in hifi:
+                expected = np.maximum(hifi[target], nano[target])
+                np.testing.assert_array_equal(lazy[target][:], expected)
+                np.testing.assert_array_equal(lazy[target][2:20], expected[2:20])
+                self.assertEqual(len(lazy[target]), len(expected))
+            with gzip.open(os.path.join(outdir, 'lazy.depth.gz'), 'rt') as f:
+                observed = f.read()
+        expected_text = ''.join(
+            f'>{target}\n' +
+            ''.join(f'{int(value)}\n' for value in np.maximum(hifi[target], nano[target]))
+            for target in hifi
+        )
+        self.assertEqual(observed, expected_text)
+        expected_intervals = gci.collapse_depth_range(
+            {target: np.maximum(hifi[target], nano[target]) for target in hifi},
+            -1, 0, 0,
+        )
+        self.assertEqual(
+            gci.collapse_depth_range(lazy, -1, 0, 0),
+            expected_intervals,
+        )
+
     def test_bam_filter_depth_and_dtype(self):
         with tempfile.TemporaryDirectory() as outdir:
             bam_path = os.path.join(outdir, 'reads.bam')
