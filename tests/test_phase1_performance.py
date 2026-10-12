@@ -83,5 +83,28 @@ class Phase1PerformanceTests(unittest.TestCase):
             np.testing.assert_array_equal(combined['chrA'], expected_combined)
 
 
+    def test_issue_intervals_preserve_original_boundaries(self):
+        depth = np.full(100, 3, dtype=np.uint32)
+        depth[15:25] = 0
+        depth[30:40] = 0
+        depth[75:85] = 0
+        # The original implementation suppresses runs ending within
+        # the first flank_len positions of the scanned interval.
+        observed = gci.collapse_depth_range({'chrA': depth}, -1, 0, 15)
+        self.assertEqual(observed['chrA'], [(30, 40), (75, 85)])
+
+        regional = np.array([0, 0, 4, 0, 0, 5, 0], dtype=np.uint32)
+        observed = gci.collapse_depth_range(
+            {'chrA': regional}, -1, 0, 0, 10
+        )
+        self.assertEqual(observed['chrA'], [(10, 12), (13, 15), (16, 17)])
+
+    def test_issue_interval_spanning_chunk_boundary(self):
+        depth = np.full(8_000_100, 2, dtype=np.uint32)
+        depth[7_999_990:8_000_040] = 0
+        observed = gci.collapse_depth_range({'chrA': depth}, -1, 0, 15)
+        self.assertEqual(observed['chrA'], [(7_999_990, 8_000_040)])
+
+
 if __name__ == '__main__':
     unittest.main()
