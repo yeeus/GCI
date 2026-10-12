@@ -8,6 +8,8 @@ Temporary files are cleaned on success and on Python exceptions.
 """
 
 from collections import OrderedDict
+from contextlib import nullcontext
+from gci_depth_events import DepthEventAccumulator, INTERVAL_DTYPE
 from multiprocessing import get_context
 from pathlib import Path
 import os
@@ -123,7 +125,7 @@ def _paf_best_target(synteny):
 
 def _partition_worker(task):
     """Resolve one read-name bucket against all input mapping files."""
-    bucket, root, n_paf, n_bam, targets, map_qual, mq_cutoff, identity_min, ovlp_min = task
+    bucket, root, n_paf, n_bam, targets, map_qual, mq_cutoff, identity_min, ovlp_min, binary_intervals = task
     root = Path(root)
     high_quality = set()
     synteny = {}
@@ -195,17 +197,29 @@ def _partition_worker(task):
     else:
         selected = files[0]
 
-    out_path = root / f'intervals.{bucket:04d}.tsv'
-    with open(out_path, 'w') as out:
-        for segment in selected.values():
-            out.write(f'{segment[0]}\t{segment[1]}\t{segment[2]}\n')
+    if binary_intervals:
+        out_path = root / f'intervals.{bucket:04d}.bin'
+        with open(out_path, 'wb') as out:
+            chunk = []
+            for segment in selected.values():
+                chunk.append((targets[segment[0]], segment[1], segment[2]))
+                if len(chunk) >= 65536:
+                    np.asarray(chunk, dtype=INTERVAL_DTYPE).tofile(out)
+                    chunk.clear()
+            if chunk:
+                np.asarray(chunk, dtype=INTERVAL_DTYPE).tofile(out)
+    else:
+        out_path = root / f'intervals.{bucket:04d}.tsv'
+        with open(out_path, 'w') as out:
+            for segment in selected.values():
+                out.write(f'{segment[0]}\t{segment[1]}\t{segment[2]}\n')
     return str(out_path), len(selected)
 
 
 def partitioned_filter(paf_files, bam_files, prefix, map_qual, mq_cutoff,
                        iden_percent, clip_percent, ovlp_percent, flank_len,
                        directory, force, log_reads_type, chrs_list, threads,
-                       scratch_dir, partitions, write_depth):
+                       scratch_dir, partitions, write_depth, accumulation='direct'):
     """Produce legacy-compatible (depths, target_lengths) with bounded partitions."""
     import pysam
 
@@ -214,6 +228,9 @@ def partitioned_filter(paf_files, bam_files, prefix, map_qual, mq_cutoff,
         raise SystemExit(f'ERROR!!! The file "{output_path}" exists. Please use -f')
     if threads < 1 or partitions < 1:
         raise ValueError('threads and partitions must be positive')
+    if accumulation not in ('direct', 'events'):
+        raise ValueError(f'Unknown accumulation mode: {accumulation}')
+    binary_intervals = accumulation == 'events'
     print(f'Filtering {log_reads_type} alignment files ...', flush=True)
 
     with pysam.AlignmentFile(bam_files[0], 'rb') as bam:
@@ -259,23 +276,43 @@ def partitioned_filter(paf_files, bam_files, prefix, map_qual, mq_cutoff,
             print(f'[GCI_PARTITION] type={log_reads_type} stage=bam_partition '
                   f'wall={time.perf_counter()-t_bam:.3f}s', flush=True)
         t_merge = time.perf_counter()
-        worker_tasks = [(b, root, len(paf_files), len(bam_files), set(targets),
-                         map_qual, mq_cutoff, iden_percent, ovlp_percent)
+        target_ids = {target: index for index, target in enumerate(targets)}
+        worker_tasks = [(b, root, len(paf_files), len(bam_files),
+                         target_ids if binary_intervals else set(targets),
+                         map_qual, mq_cutoff, iden_percent, ovlp_percent,
+                         binary_intervals)
                         for b in range(partitions)]
         accepted = 0
-        with get_context('fork').Pool(processes=min(threads, partitions)) as pool:
-            for path, count in pool.imap_unordered(_partition_worker, worker_tasks, chunksize=1):
-                accepted += count
-                with open(path) as source:
-                    for line in source:
-                        chrom, start, end = line.rstrip('\n').split('\t')
-                        start = int(start) + flank_len
-                        end = int(end) - flank_len
-                        depths[chrom][start:end + 1] += 1
-                os.remove(path)
-        if profile:
-            print(f'[GCI_PARTITION] type={log_reads_type} stage=filter_and_accumulate '
-                  f'wall={time.perf_counter()-t_merge:.3f}s accepted={accepted}', flush=True)
+        accumulator_ctx = (
+            DepthEventAccumulator(root, targets, flank_len=flank_len)
+            if binary_intervals else nullcontext()
+        )
+        with accumulator_ctx as accumulator:
+            with get_context('fork').Pool(processes=min(threads, partitions)) as pool:
+                for path, count in pool.imap_unordered(_partition_worker, worker_tasks, chunksize=1):
+                    accepted += count
+                    if binary_intervals:
+                        accumulator.add_file(path)
+                    else:
+                        with open(path) as source:
+                            for line in source:
+                                chrom, start, end = line.rstrip('\n').split('\t')
+                                start = int(start) + flank_len
+                                end = int(end) - flank_len
+                                depths[chrom][start:end + 1] += 1
+                    os.remove(path)
+            if profile:
+                print(f'[GCI_PARTITION] type={log_reads_type} '
+                      f'stage={"filter_and_stage" if binary_intervals else "filter_and_accumulate"} '
+                      f'wall={time.perf_counter()-t_merge:.3f}s accepted={accepted}', flush=True)
+            if binary_intervals:
+                t_prefix = time.perf_counter()
+                accumulator.materialize(depths)
+                if profile:
+                    print(f'[GCI_PARTITION] type={log_reads_type} stage=depth_prefix_sum '
+                          f'wall={time.perf_counter()-t_prefix:.3f}s '
+                          f'intervals={accumulator.interval_count} '
+                          f'events={accumulator.event_count}', flush=True)
 
     print(f'Filtering {log_reads_type} alignment files done!!!', flush=True)
     print(f'Writing depths into "{directory}/{prefix}.depth.gz" ...', flush=True)
