@@ -30,6 +30,24 @@ class Phase1PerformanceTests(unittest.TestCase):
         )
         self.assertEqual(actual, expected)
 
+    def test_depth_writer_handles_long_runs_and_frequent_changes(self):
+        depths = {
+            'chrA': np.array(
+                [0] * 17000 + [5] * 17000 + [4294967295] * 17,
+                dtype=np.uint32
+            ),
+            'chrB': np.tile(np.array([0, 1], dtype=np.uint32), 17000),
+        }
+        with tempfile.TemporaryDirectory() as outdir:
+            gci.write_depth(outdir, 'runs', depths, threads=2)
+            with gzip.open(os.path.join(outdir, 'runs.depth.gz'), 'rt') as handle:
+                actual = handle.read()
+        expected = ''.join(
+            f'>{target}\\n' + ''.join(f'{int(value)}\\n' for value in values)
+            for target, values in depths.items()
+        )
+        self.assertEqual(actual, expected)
+
     def test_two_type_merge_preserves_maximum_depth(self):
         hifi = {'chrA': np.array([0, 10, 7, 5], dtype=np.uint32)}
         nano = {'chrA': np.array([8, 2, 7, 11], dtype=np.uint32)}
