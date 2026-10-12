@@ -3,7 +3,9 @@
 Run from the repository root with: python -m unittest discover -s tests -v
 """
 import gzip
+import io
 import os
+from contextlib import redirect_stdout
 import tempfile
 import unittest
 from unittest import mock
@@ -139,6 +141,23 @@ class Phase1PerformanceTests(unittest.TestCase):
             expected_combined = np.zeros(200, dtype=np.uint32)
             expected_combined[60:106] = 1
             np.testing.assert_array_equal(combined['chrA'], expected_combined)
+
+            with mock.patch.dict(os.environ, {'GCI_PROFILE': '1'}):
+                capture = io.StringIO()
+                with redirect_stdout(capture):
+                    profiled, _ = gci.filter(
+                        paf_files=[paf_path], bam_files=[bam_path],
+                        directory=outdir, prefix='profile_regression',
+                        threads=1, flank_len=15,
+                    )
+            np.testing.assert_array_equal(profiled['chrA'], combined['chrA'])
+            profile_log = capture.getvalue()
+            for stage in (
+                'depth_init', 'paf_parse', 'paf_best_target',
+                'bam_pool_map', 'bam_results_merge',
+                'cross_mapper_filter', 'depth_accumulation', 'depth_write',
+            ):
+                self.assertIn(f'stage={stage}', profile_log)
 
 
     def test_issue_intervals_preserve_original_boundaries(self):
