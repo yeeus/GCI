@@ -68,6 +68,20 @@ class Phase1PerformanceTests(unittest.TestCase):
             expected[55:106] = 1  # Preserve the existing inclusive end convention.
             np.testing.assert_array_equal(depths['chrA'], expected)
 
+            # A matching PAF from another mapper should restrict the
+            # accepted interval without changing the filtering rule.
+            paf_path = os.path.join(outdir, 'reads.paf')
+            with open(paf_path, 'w') as handle:
+                handle.write('test_read\\t80\\t0\\t80\\t+\\tchrA\\t200\\t45\\t125\\t80\\t80\\t60\\n')
+            combined, _ = gci.filter(
+                paf_files=[paf_path], bam_files=[bam_path],
+                directory=outdir, prefix='bam_paf_regression',
+                threads=1, flank_len=15
+            )
+            expected_combined = np.zeros(200, dtype=np.uint32)
+            expected_combined[60:106] = 1
+            np.testing.assert_array_equal(combined['chrA'], expected_combined)
+
 
 if __name__ == '__main__':
     unittest.main()
