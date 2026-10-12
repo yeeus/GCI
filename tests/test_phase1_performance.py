@@ -72,7 +72,7 @@ class Phase1PerformanceTests(unittest.TestCase):
             # accepted interval without changing the filtering rule.
             paf_path = os.path.join(outdir, 'reads.paf')
             with open(paf_path, 'w') as handle:
-                handle.write('test_read\\t80\\t0\\t80\\t+\\tchrA\\t200\\t45\\t125\\t80\\t80\\t60\\n')
+                handle.write('test_read\t80\t0\t80\t+\tchrA\t200\t45\t125\t80\t80\t60\n')
             combined, _ = gci.filter(
                 paf_files=[paf_path], bam_files=[bam_path],
                 directory=outdir, prefix='bam_paf_regression',
