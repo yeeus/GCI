@@ -370,27 +370,38 @@ def collapse_depth_range(depths={}, leftmost=-1, rightmost=0, flank_len=15, star
     return: the dictionary containing the merged depth bed file
     """
 
-    merged_depths_bed = {target:[] for target in depths.keys()}
+    # Detect depth transitions with NumPy instead of scanning each base in Python.
+    # Bound temporary masks to one chunk, including on very long chromosomes.
+    chunk_size = 8_000_000
+    merged_depths_bed = {target: [] for target in depths}
     for target, depth_list in depths.items():
-        start_flag = 0
-        end_flag = 1
-        chr_len = len(depth_list)
-        for i, depth in enumerate(depth_list[flank_len:chr_len-flank_len]):
-            if leftmost < depth <= rightmost:
-                if start_flag == 0:
-                    start = i + flank_len
-                    start_flag = 1
-                    end_flag = 0
-                if i == (chr_len - flank_len*2 - 1):
-                    end = i + flank_len + 1
-                    merged_depths_bed[target].append((start+start_pos, end+start_pos))
-            else:
-                if end_flag == 0:
-                    if i > flank_len: #! look better
-                        end = i + flank_len
-                        merged_depths_bed[target].append((start+start_pos, end+start_pos))
-                    end_flag = 1
-                    start_flag = 0
+        region_end = len(depth_list) - flank_len
+        if region_end <= flank_len:
+            continue
+        active = False
+        for chunk_start in range(flank_len, region_end, chunk_size):
+            chunk_end = min(chunk_start + chunk_size, region_end)
+            chunk = depth_list[chunk_start:chunk_end]
+            mask = (chunk > leftmost) & (chunk <= rightmost)
+            transitions = np.flatnonzero(mask[1:] != mask[:-1]) + 1
+            if mask[0] != active:
+                transitions = np.concatenate(([0], transitions))
+            for index in transitions:
+                pos = chunk_start + int(index)
+                if mask[index]:
+                    start = pos
+                    active = True
+                else:
+                    # Preserve the previous behavior near the left flank.
+                    if pos - flank_len > flank_len:
+                        merged_depths_bed[target].append(
+                            (start + start_pos, pos + start_pos)
+                        )
+                    active = False
+        if active:
+            merged_depths_bed[target].append(
+                (start + start_pos, region_end + start_pos)
+            )
     return merged_depths_bed
 
 
