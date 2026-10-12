@@ -14,6 +14,7 @@ import multiprocessing as mp
 from multiprocessing import Pool
 import shutil
 import subprocess
+import time
 
 
 def get_Ns_ref(reference=None, prefix='GCI', directory='.', force=False):
@@ -178,6 +179,10 @@ def read_sam(args):
     target, lft, rgh, file, threads, map_qual, clip_percent, iden_percent, mq_cutoff = args
     tmp_samfile_dict = {}
     tmp_high_qual_querys = set()
+    profile_worker = os.environ.get('GCI_PROFILE') == '1'
+    if profile_worker:
+        worker_wall_start = time.perf_counter()
+        worker_cpu_start = time.process_time()
     with pysam.AlignmentFile(file, 'rb') as samfile:
         for segment in samfile.fetch(contig=target, start=lft, stop=rgh, multiple_iterators=True):
             try:
@@ -193,6 +198,11 @@ def read_sam(args):
                     tmp_samfile_dict[segment.query_name] = (segment.reference_name, segment.reference_start, segment.reference_end, segment.query_length)
                     if segment.mapping_quality >= mq_cutoff:
                         tmp_high_qual_querys.add(segment.query_name)
+    if profile_worker:
+        return tmp_samfile_dict, tmp_high_qual_querys, (
+            time.perf_counter() - worker_wall_start,
+            time.process_time() - worker_cpu_start,
+        )
     return tmp_samfile_dict, tmp_high_qual_querys
 
 
@@ -223,7 +233,41 @@ def filter(paf_files=[], bam_files=[], prefix='GCI', map_qual=30, mq_cutoff=50, 
     if os.path.exists(f'{directory}/{prefix}.depth.gz') and force == False:
         sys.exit(f'ERROR!!! The file "{directory}/{prefix}.depth.gz" exists\nPlease use "-f" or "--force" to rewrite')
     print(f'Filtering {log_reads_type} alignment files ...')
-    
+
+    profiling = os.environ.get('GCI_PROFILE') == '1'
+    if profiling:
+        import resource
+        last_wall = time.perf_counter()
+        last_cpu = time.process_time()
+        usage = resource.getrusage(resource.RUSAGE_CHILDREN)
+        last_child_cpu = usage.ru_utime + usage.ru_stime
+
+    def profile_step(stage, details=''):
+        nonlocal last_wall, last_cpu, last_child_cpu
+        if not profiling:
+            return
+        now_wall = time.perf_counter()
+        now_cpu = time.process_time()
+        child_usage = resource.getrusage(resource.RUSAGE_CHILDREN)
+        now_child_cpu = child_usage.ru_utime + child_usage.ru_stime
+        rss_kib = 0
+        if os.path.exists('/proc/self/status'):
+            with open('/proc/self/status') as status:
+                for status_line in status:
+                    if status_line.startswith('VmRSS:'):
+                        rss_kib = int(status_line.split()[1])
+                        break
+        print(
+            f'[GCI_PROFILE] type={log_reads_type} stage={stage} '
+            f'wall={now_wall-last_wall:.3f}s '
+            f'parent_cpu={now_cpu-last_cpu:.3f}s '
+            f'exited_child_cpu={now_child_cpu-last_child_cpu:.3f}s '
+            f'parent_rss={rss_kib/1048576:.3f}GiB {details}',
+            flush=True,
+        )
+        last_wall, last_cpu, last_child_cpu = (
+            now_wall, now_cpu, now_child_cpu
+        )
 
     samfile = pysam.AlignmentFile(bam_files[0], 'rb')
     if len(chrs_list) > 0:
@@ -233,7 +277,7 @@ def filter(paf_files=[], bam_files=[], prefix='GCI', map_qual=30, mq_cutoff=50, 
         depths = {reference:np.zeros(length, dtype=np.uint32) for (reference, length) in zip(samfile.references, samfile.lengths)}
         targets_length = {reference:length for (reference, length) in zip(samfile.references, samfile.lengths)}
     samfile.close()
-
+    profile_step('depth_init', f'targets={len(targets_length)}')
 
     high_qual_querys = set()
     paf_lines = [{} for i in range(len(paf_files))]
@@ -265,6 +309,7 @@ def filter(paf_files=[], bam_files=[], prefix='GCI', map_qual=30, mq_cutoff=50, 
                             if mapq >= mq_cutoff:
                                 high_qual_querys.add(query)
 
+            profile_step('paf_parse', f'file={i} reads={len(synteny)}')
             for query in synteny.keys():
                 mapping_results = {}
                 for target in synteny[query].keys():
@@ -279,7 +324,7 @@ def filter(paf_files=[], bam_files=[], prefix='GCI', map_qual=30, mq_cutoff=50, 
                 primary_target = sorted(mapping_results, key=lambda k: (mapping_results[k][0], k), reverse=True)[0]
                 primary_target_result = mapping_results[primary_target]
                 paf_lines[i][query] = (primary_target, primary_target_result[1], primary_target_result[2], primary_target_result[-1])
-
+            profile_step('paf_best_target', f'file={i} reads={len(paf_lines[i])}')
 
     samfile_dicts = [{} for _ in range(len(bam_files))]
     for i, file in enumerate(bam_files):
@@ -291,10 +336,32 @@ def filter(paf_files=[], bam_files=[], prefix='GCI', map_qual=30, mq_cutoff=50, 
                 tasks.append((target, lft, min(lft + stp, length), file, threads, map_qual, clip_percent, iden_percent, mq_cutoff))
                 lft += stp
         
+        worker_wall_total = 0.0
+        worker_cpu_total = 0.0
         with Pool(threads) as pool:
-            for tmp_samfile_dict, tmp_high_qual_querys in pool.map(read_sam, tasks):
+            results = pool.map(read_sam, tasks)
+            if profiling:
+                worker_wall_total = sum(result[2][0] for result in results)
+                worker_cpu_total = sum(result[2][1] for result in results)
+            profile_step(
+                'bam_pool_map',
+                f'file={i} tasks={len(tasks)} '
+                f'worker_wall_sum={worker_wall_total:.3f}s '
+                f'worker_cpu_sum={worker_cpu_total:.3f}s'
+            )
+            for result in results:
+                if profiling:
+                    tmp_samfile_dict, tmp_high_qual_querys, _ = result
+                else:
+                    tmp_samfile_dict, tmp_high_qual_querys = result
                 samfile_dicts[i].update(tmp_samfile_dict)
                 high_qual_querys.update(tmp_high_qual_querys)
+            del results
+        profile_step(
+            'bam_results_merge',
+            f'file={i} retained_reads={len(samfile_dicts[i])} '
+            f'high_mapq_reads={len(high_qual_querys)}'
+        )
 
     files = paf_lines + samfile_dicts
     if len(files) > 1:
@@ -326,15 +393,18 @@ def filter(paf_files=[], bam_files=[], prefix='GCI', map_qual=30, mq_cutoff=50, 
                     file1.update({query:(segment[0], segment[1], segment[2])})
     else:
         file1 = files[0]
+    profile_step('cross_mapper_filter', f'accepted_reads={len(file1)}')
     for segment in file1.values():
         target = segment[0]
         start = segment[1] + flank_len
         end = segment[2] - flank_len
         depths[target][start:end+1] += 1
-    
+    profile_step('depth_accumulation', f'intervals={len(file1)}')
+
     print(f'Filtering {log_reads_type} alignment files done!!!')
     print(f'Writing depths into "{directory}/{prefix}.depth.gz" ...')
     write_depth(directory, prefix, depths, threads)
+    profile_step('depth_write')
     print(f'Writing depths done!!!\n\n')
     return depths, targets_length
 
