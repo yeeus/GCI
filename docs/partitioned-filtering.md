@@ -43,8 +43,8 @@ Compare the new and previous outputs, including decompressed depth data:
 ```bash
 diff old/sample.gci new/sample.gci
 for type in hifi nano two_type; do
-  diff "old/sample_\${type}.0.depth.bed" "new/sample_\${type}.0.depth.bed"
-  cmp <(gzip -cd "old/sample_\${type}.depth.gz") <(gzip -cd "new/sample_\${type}.depth.gz")
+  diff "old/sample_${type}.0.depth.bed" "new/sample_${type}.0.depth.bed"
+  cmp <(gzip -cd "old/sample_${type}.depth.gz") <(gzip -cd "new/sample_${type}.depth.gz")
 done
 ```
 
