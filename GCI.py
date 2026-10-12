@@ -113,9 +113,23 @@ def write_depth(directory='.', prefix='GCI', depths={}, threads=1):
                 content = f'>{target}\n'
                 f.write(content.encode('utf-8'))
             for chunk_start in range(lft, rgh, 16384):
-                # Keep memory bounded while avoiding a gzip write per base.
-                content = '\n'.join(map(str, depth_list[chunk_start:min(chunk_start + 16384, rgh)])) + '\n'
-                f.write(content.encode('utf-8'))
+                chunk = depth_list[chunk_start:min(chunk_start + 16384, rgh)]
+                # Read-depth tracks usually contain long runs of identical values.
+                # Format one value per run instead of one value per base.
+                ends = np.flatnonzero(chunk[1:] != chunk[:-1]) + 1
+                if len(ends) > len(chunk) // 4:
+                    # Highly variable depth is faster with the original formatting.
+                    content = '\n'.join(map(str, chunk)) + '\n'
+                    f.write(content.encode('utf-8'))
+                else:
+                    runs = []
+                    start = 0
+                    for end in ends:
+                        stop = int(end)
+                        runs.append(f'{int(chunk[start])}\n'.encode('ascii') * (stop - start))
+                        start = stop
+                    runs.append(f'{int(chunk[start])}\n'.encode('ascii') * (len(chunk) - start))
+                    f.write(b''.join(runs))
     
 
     processes = []
