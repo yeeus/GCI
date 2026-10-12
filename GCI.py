@@ -112,8 +112,9 @@ def write_depth(directory='.', prefix='GCI', depths={}, threads=1):
             if number == 0:
                 content = f'>{target}\n'
                 f.write(content.encode('utf-8'))
-            for depth in depth_list[lft:rgh]:
-                content = f'{depth}\n'
+            for chunk_start in range(lft, rgh, 16384):
+                # Keep memory bounded while avoiding a gzip write per base.
+                content = '\n'.join(map(str, depth_list[chunk_start:min(chunk_start + 16384, rgh)])) + '\n'
                 f.write(content.encode('utf-8'))
     
 
@@ -154,19 +155,15 @@ def read_sam(args):
     target, lft, rgh, file, threads, map_qual, clip_percent, iden_percent, mq_cutoff = args
     tmp_samfile_dict = {}
     tmp_high_qual_querys = set()
-    with pysam.AlignmentFile(file, 'rb', threads=threads) as samfile:
+    with pysam.AlignmentFile(file, 'rb') as samfile:
         for segment in samfile.fetch(contig=target, start=lft, stop=rgh, multiple_iterators=True):
             try:
                 flag1 = segment.is_mapped
             except AttributeError:
                 flag1 = not segment.is_unmapped
             if (flag1 == True) and (segment.is_secondary == False) and (segment.is_supplementary == False) and (segment.mapping_quality >= map_qual):
-                M = segment.get_cigar_stats()[0][0]
-                I = segment.get_cigar_stats()[0][1]
-                D = segment.get_cigar_stats()[0][2]
-                S = segment.get_cigar_stats()[0][4]
-                eq = segment.get_cigar_stats()[0][7]
-                X = segment.get_cigar_stats()[0][8]
+                cigar_counts = segment.get_cigar_stats()[0]
+                M, I, D, S, eq, X = (cigar_counts[j] for j in (0, 1, 2, 4, 7, 8))
                 NM = segment.get_tag('NM')
                 mm = NM - (I + D)
                 if (S/(M+eq+X+I+S) <= clip_percent) and ((M+eq+X-mm)/(M+eq+X+I+D) >= iden_percent):
@@ -205,12 +202,12 @@ def filter(paf_files=[], bam_files=[], prefix='GCI', map_qual=30, mq_cutoff=50, 
     print(f'Filtering {log_reads_type} alignment files ...')
     
 
-    samfile = pysam.AlignmentFile(bam_files[0], 'rb', threads=threads)
+    samfile = pysam.AlignmentFile(bam_files[0], 'rb')
     if len(chrs_list) > 0:
-        depths = {reference:np.zeros(length, dtype=int) for (reference, length) in zip(samfile.references, samfile.lengths) if reference in chrs_list}
+        depths = {reference:np.zeros(length, dtype=np.uint32) for (reference, length) in zip(samfile.references, samfile.lengths) if reference in chrs_list}
         targets_length = {reference:length for (reference, length) in zip(samfile.references, samfile.lengths) if reference in chrs_list}
     else:
-        depths = {reference:np.zeros(length, dtype=int) for (reference, length) in zip(samfile.references, samfile.lengths)}
+        depths = {reference:np.zeros(length, dtype=np.uint32) for (reference, length) in zip(samfile.references, samfile.lengths)}
         targets_length = {reference:length for (reference, length) in zip(samfile.references, samfile.lengths)}
     samfile.close()
 
@@ -354,7 +351,7 @@ def merge_two_type_depth(hifi_depths={}, nano_depths={}, prefix='GCI_two_type', 
     if os.path.exists(f'{directory}/{prefix}.depth.gz') and force == False:
         sys.exit(f'ERROR!!! The file "{directory}/{prefix}.depth.gz" exists\nPlease use "-f" or "--force" to rewrite')
 
-    merged_two_type_depths = {target:np.array([max(hifi_depth, nano_depth) for (hifi_depth, nano_depth) in zip(hifi_depth_list, nano_depths[target])]) for target, hifi_depth_list in hifi_depths.items()}
+    merged_two_type_depths = {target:np.maximum(hifi_depth_list, nano_depths[target]) for target, hifi_depth_list in hifi_depths.items()}
     write_depth(directory, prefix, merged_two_type_depths, threads)
     print('Merging HiFi and ONT depth file done!!!\n\n')
     return merged_two_type_depths
@@ -868,10 +865,9 @@ def plot_depth(depths_list=[], depth_min=0.1, depth_max=4.0, window_size=50000, 
     
     mean_depths = []
     for depthss in depths_list:
-        sum_depths = []
-        for depths in depthss.values():
-            sum_depths = np.concatenate((sum_depths, depths))
-        mean_depths.append(np.mean(sum_depths))
+        total_depth = sum(int(np.sum(depths, dtype=np.uint64)) for depths in depthss.values())
+        total_length = sum(depths.size for depths in depthss.values())
+        mean_depths.append(total_depth / total_length if total_length else 0)
     max_depths = [mean_depth * depth_max for mean_depth in mean_depths]
     
     for target in depths_list[0].keys():
@@ -967,7 +963,7 @@ def GCI(hifi=[], nano=[], directory='.', prefix='GCI', map_qual=30, mq_cutoff=50
         for file in hifi:
             if file.endswith('.bam'):
                 hifi_bam.append(file)
-                hifi_samfile = pysam.AlignmentFile(file, 'rb', threads=threads)
+                hifi_samfile = pysam.AlignmentFile(file, 'rb')
                 hifi_refs_lengths = {reference:length for (reference, length) in zip(hifi_samfile.references, hifi_samfile.lengths)}
                 hifi_samfile.close()
             else:
@@ -978,7 +974,7 @@ def GCI(hifi=[], nano=[], directory='.', prefix='GCI', map_qual=30, mq_cutoff=50
         for file in nano:
             if file.endswith('.bam'):
                 nano_bam.append(file)
-                nano_samfile = pysam.AlignmentFile(file, 'rb', threads=threads)
+                nano_samfile = pysam.AlignmentFile(file, 'rb')
                 nano_refs_lengths = {reference:length for (reference, length) in zip(nano_samfile.references, nano_samfile.lengths)}
                 nano_samfile.close()
             else:
