@@ -43,7 +43,7 @@ class Phase1PerformanceTests(unittest.TestCase):
             with gzip.open(os.path.join(outdir, 'runs.depth.gz'), 'rt') as handle:
                 actual = handle.read()
         expected = ''.join(
-            f'>{target}\\n' + ''.join(f'{int(value)}\\n' for value in values)
+            f'>{target}\n' + ''.join(f'{int(value)}\n' for value in values)
             for target, values in depths.items()
         )
         self.assertEqual(actual, expected)
