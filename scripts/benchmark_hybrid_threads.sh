@@ -49,6 +49,8 @@ for t in $THREADS; do
         for type in hifi nano two_type; do
             diff -q "$BASELINE_DIR/mat_${type}.0.depth.bed" \
                     "$out/mat_${type}.0.depth.bed"
+            gzip -t "$BASELINE_DIR/mat_${type}.depth.gz"
+            gzip -t "$out/mat_${type}.depth.gz"
             cmp <(gzip -cd "$BASELINE_DIR/mat_${type}.depth.gz") \
                 <(gzip -cd "$out/mat_${type}.depth.gz")
         done
