@@ -125,25 +125,31 @@ def _paf_best_target(synteny):
 
 def _partition_worker(task):
     """Resolve one read-name bucket against all input mapping files."""
-    bucket, root, n_paf, n_bam, targets, map_qual, mq_cutoff, identity_min, ovlp_min, binary_intervals = task
+    bucket, root, n_paf, n_bam, targets, map_qual, mq_cutoff, identity_min, ovlp_min, binary_intervals, shard_plan = task
     root = Path(root)
     high_quality = set()
     synteny = {}
     paf_maps = [{} for _ in range(n_paf)]
-    paf_path = root / f'paf.{bucket:04d}.tsv'
-
-    # Legacy synteny is cumulative across PAF files. Snapshot it after
-    # each input file so multiple-PAF behavior remains unchanged.
-    if paf_path.exists():
-        current_file = 0
+    # Sharded inputs are read in original file / byte-range order.
+    # The Phase 2B/C path continues using one bucket file with file IDs.
+    if shard_plan is None:
+        paf_inputs = [(None, root / f'paf.{bucket:04d}.tsv', True)]
+    else:
+        from gci_partition_fast import paf_bucket_fragments
+        paf_inputs = [(file_id, path, False)
+                      for file_id, path in paf_bucket_fragments(root, bucket, shard_plan[0])]
+    current_file = 0
+    for fixed_file_id, paf_path, has_file_id in paf_inputs:
+        if not paf_path.exists():
+            continue
         with open(paf_path) as src:
             for line in src:
                 parts = line.rstrip('\n').split('\t')
-                file_id = int(parts[0])
+                file_id = int(parts[0]) if has_file_id else fixed_file_id
                 while current_file < file_id:
                     paf_maps[current_file] = _paf_best_target(synteny)
                     current_file += 1
-                paf = parts[1:]
+                paf = parts[1:] if has_file_id else parts
                 target = paf[5]
                 if target not in targets:
                     continue
@@ -158,15 +164,25 @@ def _partition_worker(task):
                     )
                     if mapq >= mq_cutoff:
                         high_quality.add(qname)
-        for file_id in range(current_file, n_paf):
-            paf_maps[file_id] = _paf_best_target(synteny)
+    # Also snapshots files without any records in this bucket.
+    for file_id in range(current_file, n_paf):
+        paf_maps[file_id] = _paf_best_target(synteny)
 
     del synteny
     bam_maps = []
+    bam_fragments = [[] for _ in range(n_bam)]
+    if shard_plan is None:
+        for file_id in range(n_bam):
+            bam_fragments[file_id].append(root / f'bam{file_id}.{bucket:04d}.tsv')
+    else:
+        from gci_partition_fast import bam_bucket_fragments
+        for file_id, path in bam_bucket_fragments(root, bucket, shard_plan[1]):
+            bam_fragments[file_id].append(path)
     for file_id in range(n_bam):
         reads = {}
-        bam_path = root / f'bam{file_id}.{bucket:04d}.tsv'
-        if bam_path.exists():
+        for bam_path in bam_fragments[file_id]:
+            if not bam_path.exists():
+                continue
             with open(bam_path) as src:
                 for line in src:
                     qname, chrom, start, end, qlen, high = line.rstrip('\n').split('\t')
@@ -219,7 +235,8 @@ def _partition_worker(task):
 def partitioned_filter(paf_files, bam_files, prefix, map_qual, mq_cutoff,
                        iden_percent, clip_percent, ovlp_percent, flank_len,
                        directory, force, log_reads_type, chrs_list, threads,
-                       scratch_dir, partitions, write_depth, accumulation='direct'):
+                       scratch_dir, partitions, write_depth, accumulation='direct',
+                       input_mode='serial', input_shards=16):
     """Produce legacy-compatible (depths, target_lengths) with bounded partitions."""
     import pysam
 
@@ -230,6 +247,12 @@ def partitioned_filter(paf_files, bam_files, prefix, map_qual, mq_cutoff,
         raise ValueError('threads and partitions must be positive')
     if accumulation not in ('direct', 'events'):
         raise ValueError(f'Unknown accumulation mode: {accumulation}')
+    if input_mode not in ('serial', 'parallel'):
+        raise ValueError(f'Unknown input partition mode: {input_mode}')
+    if input_shards < 1:
+        raise ValueError('input_shards must be positive')
+    if input_mode == 'parallel' and accumulation != 'events':
+        raise ValueError('Parallel input partitioning requires event accumulation')
     binary_intervals = accumulation == 'events'
     print(f'Filtering {log_reads_type} alignment files ...', flush=True)
 
@@ -242,36 +265,50 @@ def partitioned_filter(paf_files, bam_files, prefix, map_qual, mq_cutoff,
     profile = os.environ.get('GCI_PROFILE') == '1'
 
     with tempfile.TemporaryDirectory(prefix='gci-part-', dir=scratch_dir) as root:
-        # Partition raw PAF lines cheaply. Workers later perform full parsing.
-        with _BucketWriter(root, 'paf', partitions) as writer:
-            for i, path in enumerate(paf_files):
-                with open(path) as source:
-                    for line in source:
-                        query = line.split('\t', 1)[0]
-                        writer.write(query, str(i) + '\t' + line)
+        if input_mode == 'parallel':
+            from gci_partition_fast import partition_paf_parallel
+            paf_group_counts = partition_paf_parallel(
+                paf_files, root, partitions, threads, input_shards
+            )
+        else:
+            paf_group_counts = None
+            # Existing Phase 2B/C PAF demultiplexing is unchanged.
+            with _BucketWriter(root, 'paf', partitions) as writer:
+                for i, path in enumerate(paf_files):
+                    with open(path) as source:
+                        for line in source:
+                            query = line.split('\t', 1)[0]
+                            writer.write(query, str(i) + '\t' + line)
         if profile:
             print(f'[GCI_PARTITION] type={log_reads_type} stage=paf_partition '
                   f'wall={time.perf_counter()-t0:.3f}s', flush=True)
         t_bam = time.perf_counter()
 
-        # Use the same BAM window iteration and overwrite precedence as legacy.
-        for file_id, bam_path in enumerate(bam_files):
-            tasks = []
-            for target, length in targets.items():
-                step = 1 + (length - 1) // threads
-                for left in range(0, length, step):
-                    tasks.append((len(tasks), target, left, min(left + step, length),
-                                  bam_path, map_qual, clip_percent,
-                                  iden_percent, mq_cutoff, root))
-            with _BucketWriter(root, f'bam{file_id}', partitions) as writer:
-                if tasks:
-                    with get_context('fork').Pool(processes=min(threads, len(tasks))) as pool:
-                        # Ordered iteration reproduces legacy update() precedence.
-                        for path, count in pool.imap(_bam_task, tasks, chunksize=1):
-                            with open(path) as source:
-                                for line in source:
-                                    writer.write(line.split('\t', 1)[0], line)
-                            os.remove(path)
+        if input_mode == 'parallel':
+            from gci_partition_fast import partition_bam_parallel
+            bam_group_counts = partition_bam_parallel(
+                bam_files, targets, root, partitions, threads, input_shards,
+                map_qual, clip_percent, iden_percent, mq_cutoff
+            )
+        else:
+            bam_group_counts = None
+            # Existing Phase 2B/C ordered BAM window redistribution is unchanged.
+            for file_id, bam_path in enumerate(bam_files):
+                tasks = []
+                for target, length in targets.items():
+                    step = 1 + (length - 1) // threads
+                    for left in range(0, length, step):
+                        tasks.append((len(tasks), target, left, min(left + step, length),
+                                      bam_path, map_qual, clip_percent,
+                                      iden_percent, mq_cutoff, root))
+                with _BucketWriter(root, f'bam{file_id}', partitions) as writer:
+                    if tasks:
+                        with get_context('fork').Pool(processes=min(threads, len(tasks))) as pool:
+                            for path, count in pool.imap(_bam_task, tasks, chunksize=1):
+                                with open(path) as source:
+                                    for line in source:
+                                        writer.write(line.split('\t', 1)[0], line)
+                                os.remove(path)
         if profile:
             print(f'[GCI_PARTITION] type={log_reads_type} stage=bam_partition '
                   f'wall={time.perf_counter()-t_bam:.3f}s', flush=True)
@@ -280,7 +317,9 @@ def partitioned_filter(paf_files, bam_files, prefix, map_qual, mq_cutoff,
         worker_tasks = [(b, root, len(paf_files), len(bam_files),
                          target_ids if binary_intervals else set(targets),
                          map_qual, mq_cutoff, iden_percent, ovlp_percent,
-                         binary_intervals)
+                         binary_intervals,
+                         (paf_group_counts, bam_group_counts)
+                         if input_mode == 'parallel' else None)
                         for b in range(partitions)]
         accepted = 0
         accumulator_ctx = (
