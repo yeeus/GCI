@@ -132,7 +132,7 @@ def _partition_worker(task):
     paf_maps = [{} for _ in range(n_paf)]
     # Sharded inputs are read in original file / byte-range order.
     # The Phase 2B/C path continues using one bucket file with file IDs.
-    if shard_plan is None:
+    if shard_plan is None or shard_plan[0] is None:
         paf_inputs = [(None, root / f'paf.{bucket:04d}.tsv', True)]
     else:
         from gci_partition_fast import paf_bucket_fragments
@@ -171,7 +171,7 @@ def _partition_worker(task):
     del synteny
     bam_maps = []
     bam_fragments = [[] for _ in range(n_bam)]
-    if shard_plan is None:
+    if shard_plan is None or shard_plan[1] is None:
         for file_id in range(n_bam):
             bam_fragments[file_id].append(root / f'bam{file_id}.{bucket:04d}.tsv')
     else:
@@ -247,12 +247,12 @@ def partitioned_filter(paf_files, bam_files, prefix, map_qual, mq_cutoff,
         raise ValueError('threads and partitions must be positive')
     if accumulation not in ('direct', 'events'):
         raise ValueError(f'Unknown accumulation mode: {accumulation}')
-    if input_mode not in ('serial', 'parallel'):
+    if input_mode not in ('serial', 'parallel', 'hybrid'):
         raise ValueError(f'Unknown input partition mode: {input_mode}')
     if input_shards < 1:
         raise ValueError('input_shards must be positive')
-    if input_mode == 'parallel' and accumulation != 'events':
-        raise ValueError('Parallel input partitioning requires event accumulation')
+    if input_mode in ('parallel', 'hybrid') and accumulation != 'events':
+        raise ValueError('Parallel PAF partitioning requires event accumulation')
     binary_intervals = accumulation == 'events'
     print(f'Filtering {log_reads_type} alignment files ...', flush=True)
 
@@ -265,7 +265,7 @@ def partitioned_filter(paf_files, bam_files, prefix, map_qual, mq_cutoff,
     profile = os.environ.get('GCI_PROFILE') == '1'
 
     with tempfile.TemporaryDirectory(prefix='gci-part-', dir=scratch_dir) as root:
-        if input_mode == 'parallel':
+        if input_mode in ('parallel', 'hybrid'):
             from gci_partition_fast import partition_paf_parallel
             paf_group_counts = partition_paf_parallel(
                 paf_files, root, partitions, threads, input_shards
@@ -319,7 +319,7 @@ def partitioned_filter(paf_files, bam_files, prefix, map_qual, mq_cutoff,
                          map_qual, mq_cutoff, iden_percent, ovlp_percent,
                          binary_intervals,
                          (paf_group_counts, bam_group_counts)
-                         if input_mode == 'parallel' else None)
+                         if input_mode in ('parallel', 'hybrid') else None)
                         for b in range(partitions)]
         accepted = 0
         accumulator_ctx = (
