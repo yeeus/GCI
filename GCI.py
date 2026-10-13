@@ -230,7 +230,7 @@ def filter(paf_files=[], bam_files=[], prefix='GCI', map_qual=30, mq_cutoff=50, 
     return: the whole-genome depth dictionary,
             one dictionary keyed by the targets with the length value
     """
-    if filter_backend in ('partitioned', 'partitioned-v2', 'partitioned-v3'):
+    if filter_backend in ('partitioned', 'partitioned-v2', 'partitioned-v3', 'partitioned-hybrid'):
         from gci_partitioned import partitioned_filter
         return partitioned_filter(
             paf_files, bam_files, prefix, map_qual, mq_cutoff, iden_percent,
@@ -238,7 +238,9 @@ def filter(paf_files=[], bam_files=[], prefix='GCI', map_qual=30, mq_cutoff=50, 
             log_reads_type, chrs_list, threads, scratch_dir, partitions,
             write_depth,
             accumulation='direct' if filter_backend == 'partitioned' else 'events',
-            input_mode='parallel' if filter_backend == 'partitioned-v3' else 'serial',
+            input_mode=('parallel' if filter_backend == 'partitioned-v3'
+                        else 'hybrid' if filter_backend == 'partitioned-hybrid'
+                        else 'serial'),
             input_shards=input_shards
         )
     if filter_backend != 'legacy':
@@ -1168,14 +1170,14 @@ if __name__=='__main__':
     group_io.add_argument('-ts', '--threshold', metavar='INT', type=int, help='The threshold of depth to be reported as issues [0]', default=0)
     group_io.add_argument('-dp', '--dist-percent', metavar='FLOAT', type=float, help='The distance between the candidate gap intervals for combining in chromosome units [0.005]', default=0.005)
     group_io.add_argument('-t', '--threads', metavar='INT', type=int, help='Number of threads [1]', default=1)
-    group_io.add_argument('--filter-backend', choices=['legacy', 'partitioned', 'partitioned-v2', 'partitioned-v3'], default='legacy',
-                          help='Filtering backend [legacy]; partitioned-v2 adds binary interval and difference-array depth')
+    group_io.add_argument('--filter-backend', choices=['legacy', 'partitioned', 'partitioned-v2', 'partitioned-v3', 'partitioned-hybrid'], default='legacy',
+                          help='Filtering backend [legacy]; partitioned-hybrid combines parallel PAF with Phase 2C BAM partitioning')
     group_io.add_argument('--scratch-dir', default=None, metavar='DIR',
                           help='Temporary partition directory; use node-local scratch (default: system TMPDIR)')
     group_io.add_argument('--partitions', type=int, default=256, metavar='INT',
                           help='Read-name hash partitions for partitioned filtering [256]')
     group_io.add_argument('--input-shards', type=int, default=16, metavar='INT',
-                          help='PAF/BAM parallel input groups in partitioned-v3 [16]')
+                          help='Parallel PAF input groups (hybrid/v3), and BAM groups (v3 only) [16]')
     group_io.add_argument('-d', dest='directory', metavar='PATH', help='The directory of output files [.]', default='.')
     group_io.add_argument('-o', '--output', dest='prefix', metavar='STR', help='Prefix of output files [GCI]', default='GCI')
 
