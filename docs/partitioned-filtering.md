@@ -19,6 +19,7 @@ python GCI.py -r /path/assembly.fa \
 - `--filter-backend partitioned` retains the Phase 2B text-interval backend (MF2-verified baseline).
 - `--filter-backend partitioned-v2` enables Phase 2C: compact binary intervals and event-based bounded-memory coverage accumulation. This is experimental until MF2 output verification.
 - `--filter-backend partitioned-v3` enables Phase 2D: direct parallel PAF/BAM input sharding with the same Phase 2C binary intervals and event-based coverage. MF2 verification required.
+- `--filter-backend partitioned-hybrid` combines **parallel Phase 2D PAF splitting** with **ordered Phase 2C BAM partitioning**, then uses Phase 2C binary intervals, difference events and depth writing. This is the recommended experimental Phase 2D alternative; exact MF2 equivalence and runtime must still be measured.
 - `--scratch-dir` must exist and have sufficient free disk space. Prefer node-local SSD/NVMe scratch, not a shared filesystem. When omitted, Python uses the system temporary directory (`TMPDIR` or `/tmp`).
 - `--partitions` controls hash buckets for read-name grouping; 256 is the default. More buckets reduce peak per-worker read dictionaries but increase partition file count and filesystem overhead.
 - `-t` controls the BAM processing and read-partition worker counts. Start with 16 on real data. Try 32 or 64 only after output equivalence is verified.
@@ -41,6 +42,42 @@ Run exactly the Phase 2B benchmark except use:
 ```
 
 Use a node-local scratch directory with ample capacity, and compare **all** files against previously verified `test4`: `mat.gci`, `mat_hifi.0.depth.bed`, `mat_nano.0.depth.bed`, `mat_two_type.0.depth.bed`, and each corresponding `.depth.gz` after decompressing. Keep `-t 16` for the first comparison; tune 32/64 only after exact results pass.
+
+## Phase 2D Hybrid and thread scaling
+
+The prior `partitioned-v3` increased BAM partition time on full MF2. The
+`partitioned-hybrid` option retains the faster parallel PAF producer, but
+restores Phase 2C's many small BAM window tasks plus **one ordered BAM bucket
+file per read-name partition**, removing the extra per-group BAM shards. It
+does not modify the scoring or coverage rules.
+
+The default remains `legacy` until the hybrid version passes full-data
+comparison. On full MF2, use `test5` (`partitioned-v2`) as the verified output
+baseline.
+
+The `-t` value controls workers **and BAM window boundaries**, so it can
+change performance, resident memory and, in ambiguous repeated-query edge
+cases, selected read records. CPU percentages averaged across an entire run
+do not determine the optimal `-t`. Benchmark at constant
+`--input-shards 16 --partitions 256`, varying only `-t`:
+
+```bash
+git fetch origin dev && git switch dev && git pull --ff-only origin dev
+python -m unittest discover -s tests -v
+THREADS="4 8 16 32" BASELINE_DIR=test5 bash scripts/benchmark_hybrid_threads.sh
+```
+
+The script runs each configuration sequentially on the same input, captures
+`/usr/bin/time -v` and stage timings, and checks GCI, BED and decompressed
+depth equality against the baseline. It **stops immediately** on a mismatch.
+If outputs differ between `-t` values, investigate the BAM-window overwrite
+semantics before selecting one for production use.
+
+For the first run, `-t 16 --input-shards 16` provides a fair comparison with
+the existing Phase 2C benchmark. `-t 4` may consume fewer reserved cores
+but can be slower because PAF and BAM workers lose concurrency. Measure wall
+time, CPU seconds, allocated core-seconds (`t × wall seconds`), peak RSS and
+scratch I/O. Pin input versions and scratch filesystem when comparing.
 
 ## Phase 2D: parallel input partitioning
 
