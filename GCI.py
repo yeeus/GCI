@@ -206,7 +206,7 @@ def read_sam(args):
     return tmp_samfile_dict, tmp_high_qual_querys
 
 
-def filter(paf_files=[], bam_files=[], prefix='GCI', map_qual=30, mq_cutoff=50, iden_percent=0.9, clip_percent=0.1, ovlp_percent=0.9, flank_len=15, directory='.', force=False, log_reads_type='', chrs_list=[], threads=1, filter_backend='legacy', scratch_dir=None, partitions=256):
+def filter(paf_files=[], bam_files=[], prefix='GCI', map_qual=30, mq_cutoff=50, iden_percent=0.9, clip_percent=0.1, ovlp_percent=0.9, flank_len=15, directory='.', force=False, log_reads_type='', chrs_list=[], threads=1, filter_backend='legacy', scratch_dir=None, partitions=256, input_shards=16):
     """
     usage: filter the paf and bam file(s) based on many metrics, and finally generate the gzipped depth file
 
@@ -230,14 +230,16 @@ def filter(paf_files=[], bam_files=[], prefix='GCI', map_qual=30, mq_cutoff=50, 
     return: the whole-genome depth dictionary,
             one dictionary keyed by the targets with the length value
     """
-    if filter_backend in ('partitioned', 'partitioned-v2'):
+    if filter_backend in ('partitioned', 'partitioned-v2', 'partitioned-v3'):
         from gci_partitioned import partitioned_filter
         return partitioned_filter(
             paf_files, bam_files, prefix, map_qual, mq_cutoff, iden_percent,
             clip_percent, ovlp_percent, flank_len, directory, force,
             log_reads_type, chrs_list, threads, scratch_dir, partitions,
             write_depth,
-            accumulation='events' if filter_backend == 'partitioned-v2' else 'direct'
+            accumulation='direct' if filter_backend == 'partitioned' else 'events',
+            input_mode='parallel' if filter_backend == 'partitioned-v3' else 'serial',
+            input_shards=input_shards
         )
     if filter_backend != 'legacy':
         raise ValueError(f'Unknown filter backend: {filter_backend}')
@@ -1015,7 +1017,7 @@ def plot_depth(depths_list=[], depth_min=0.1, depth_max=4.0, window_size=50000, 
         print(f'Plotting depth for regions done!!!\n\n')
 
 
-def GCI(hifi=[], nano=[], directory='.', prefix='GCI', map_qual=30, mq_cutoff=50, iden_percent=0.9, ovlp_percent=0.9, clip_percent=0.1, flank_len=15, threshold=0, plot=False, depth_min=0.1, depth_max=4.0, window_size=50000, image_type='png', force=False, dist_percent=0.005, reference=None, regions=None, chrs=None, threads=1, filter_backend='legacy', scratch_dir=None, partitions=256):
+def GCI(hifi=[], nano=[], directory='.', prefix='GCI', map_qual=30, mq_cutoff=50, iden_percent=0.9, ovlp_percent=0.9, clip_percent=0.1, flank_len=15, threshold=0, plot=False, depth_min=0.1, depth_max=4.0, window_size=50000, image_type='png', force=False, dist_percent=0.005, reference=None, regions=None, chrs=None, threads=1, filter_backend='legacy', scratch_dir=None, partitions=256, input_shards=16):
     chrs_list = []
     if chrs != None:
         chrs_list = chrs.strip().split(',')
@@ -1110,7 +1112,7 @@ def GCI(hifi=[], nano=[], directory='.', prefix='GCI', map_qual=30, mq_cutoff=50
     
 
     if nano == None:
-        depths, targets_length = filter(hifi_paf, hifi_bam, prefix, map_qual, mq_cutoff, iden_percent, clip_percent, ovlp_percent, flank_len, directory, force, 'HiFi', chrs_list, threads, filter_backend, scratch_dir, partitions)
+        depths, targets_length = filter(hifi_paf, hifi_bam, prefix, map_qual, mq_cutoff, iden_percent, clip_percent, ovlp_percent, flank_len, directory, force, 'HiFi', chrs_list, threads, filter_backend, scratch_dir, partitions, input_shards)
         depths = merge_gaps_depths(depths, Ns_bed)
         merged_depth_bed = merge_depth(depths, prefix, threshold, flank_len, directory, force, 'HiFi')
         compute_index(targets_length, prefix, directory, force, [merged_depth_bed], ['HiFi'], flank_len, dist_percent, regions_bed, [depths], threshold, chrs_list)
@@ -1118,7 +1120,7 @@ def GCI(hifi=[], nano=[], directory='.', prefix='GCI', map_qual=30, mq_cutoff=50
             plot_depth([depths], depth_min, depth_max, window_size, image_type, directory, prefix, force, targets_length, dist_percent, regions_bed, threshold)
 
     elif hifi == None:
-        depths, targets_length = filter(nano_paf, nano_bam, prefix, map_qual, mq_cutoff, iden_percent, clip_percent, ovlp_percent, flank_len, directory, force, 'ONT', chrs_list, threads, filter_backend, scratch_dir, partitions)
+        depths, targets_length = filter(nano_paf, nano_bam, prefix, map_qual, mq_cutoff, iden_percent, clip_percent, ovlp_percent, flank_len, directory, force, 'ONT', chrs_list, threads, filter_backend, scratch_dir, partitions, input_shards)
         depths = merge_gaps_depths(depths, Ns_bed)
         merged_depth_bed = merge_depth(depths, prefix, threshold, flank_len, directory, force, 'ONT')
         compute_index(targets_length, prefix, directory, force, [merged_depth_bed], ['Nano'], flank_len, dist_percent, regions_bed, [depths], threshold, chrs_list)
@@ -1132,9 +1134,9 @@ def GCI(hifi=[], nano=[], directory='.', prefix='GCI', map_qual=30, mq_cutoff=50
             if length != nano_refs_lengths[target]:
                 sys.exit(f'ERROR!!! The element "{target}:{length}" in hifi alignment files are inconsistent with that in ont alignment files which is "{target}:{nano_refs_lengths[target]}"\nPlease check the reference used in mapping both hifi and ont reads')
 
-        hifi_depths, targets_length = filter(hifi_paf, hifi_bam, prefix+'_hifi', map_qual, mq_cutoff, iden_percent, clip_percent, ovlp_percent, flank_len, directory, force, 'HiFi', chrs_list, threads, filter_backend, scratch_dir, partitions)
+        hifi_depths, targets_length = filter(hifi_paf, hifi_bam, prefix+'_hifi', map_qual, mq_cutoff, iden_percent, clip_percent, ovlp_percent, flank_len, directory, force, 'HiFi', chrs_list, threads, filter_backend, scratch_dir, partitions, input_shards)
         hifi_depths = merge_gaps_depths(hifi_depths, Ns_bed)
-        nano_depths, targets_length = filter(nano_paf, nano_bam, prefix+'_nano', map_qual, mq_cutoff, iden_percent, clip_percent, ovlp_percent, flank_len, directory, force, 'ONT', chrs_list, threads, filter_backend, scratch_dir, partitions)
+        nano_depths, targets_length = filter(nano_paf, nano_bam, prefix+'_nano', map_qual, mq_cutoff, iden_percent, clip_percent, ovlp_percent, flank_len, directory, force, 'ONT', chrs_list, threads, filter_backend, scratch_dir, partitions, input_shards)
         nano_depths = merge_gaps_depths(nano_depths, Ns_bed)
         merged_two_type_depths = merge_two_type_depth(hifi_depths, nano_depths, prefix+'_two_type', directory, force, threads, lazy=True)
         # Both source tracks have already been gap-masked; their maximum is masked too.
@@ -1166,12 +1168,14 @@ if __name__=='__main__':
     group_io.add_argument('-ts', '--threshold', metavar='INT', type=int, help='The threshold of depth to be reported as issues [0]', default=0)
     group_io.add_argument('-dp', '--dist-percent', metavar='FLOAT', type=float, help='The distance between the candidate gap intervals for combining in chromosome units [0.005]', default=0.005)
     group_io.add_argument('-t', '--threads', metavar='INT', type=int, help='Number of threads [1]', default=1)
-    group_io.add_argument('--filter-backend', choices=['legacy', 'partitioned', 'partitioned-v2'], default='legacy',
+    group_io.add_argument('--filter-backend', choices=['legacy', 'partitioned', 'partitioned-v2', 'partitioned-v3'], default='legacy',
                           help='Filtering backend [legacy]; partitioned-v2 adds binary interval and difference-array depth')
     group_io.add_argument('--scratch-dir', default=None, metavar='DIR',
                           help='Temporary partition directory; use node-local scratch (default: system TMPDIR)')
     group_io.add_argument('--partitions', type=int, default=256, metavar='INT',
                           help='Read-name hash partitions for partitioned filtering [256]')
+    group_io.add_argument('--input-shards', type=int, default=16, metavar='INT',
+                          help='PAF/BAM parallel input groups in partitioned-v3 [16]')
     group_io.add_argument('-d', dest='directory', metavar='PATH', help='The directory of output files [.]', default='.')
     group_io.add_argument('-o', '--output', dest='prefix', metavar='STR', help='Prefix of output files [GCI]', default='GCI')
 
