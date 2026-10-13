@@ -18,6 +18,7 @@ python GCI.py -r /path/assembly.fa \
 - `--filter-backend legacy` is the default. The new backend must be requested explicitly.
 - `--filter-backend partitioned` retains the Phase 2B text-interval backend (MF2-verified baseline).
 - `--filter-backend partitioned-v2` enables Phase 2C: compact binary intervals and event-based bounded-memory coverage accumulation. This is experimental until MF2 output verification.
+- `--filter-backend partitioned-v3` enables Phase 2D: direct parallel PAF/BAM input sharding with the same Phase 2C binary intervals and event-based coverage. MF2 verification required.
 - `--scratch-dir` must exist and have sufficient free disk space. Prefer node-local SSD/NVMe scratch, not a shared filesystem. When omitted, Python uses the system temporary directory (`TMPDIR` or `/tmp`).
 - `--partitions` controls hash buckets for read-name grouping; 256 is the default. More buckets reduce peak per-worker read dictionaries but increase partition file count and filesystem overhead.
 - `-t` controls the BAM processing and read-partition worker counts. Start with 16 on real data. Try 32 or 64 only after output equivalence is verified.
@@ -40,6 +41,26 @@ Run exactly the Phase 2B benchmark except use:
 ```
 
 Use a node-local scratch directory with ample capacity, and compare **all** files against previously verified `test4`: `mat.gci`, `mat_hifi.0.depth.bed`, `mat_nano.0.depth.bed`, `mat_two_type.0.depth.bed`, and each corresponding `.depth.gz` after decompressing. Keep `-t 16` for the first comparison; tune 32/64 only after exact results pass.
+
+## Phase 2D: parallel input partitioning
+
+The experimental `partitioned-v3` backend replaces the two large input partition stages:
+
+- **PAF:** A PAF input is split into contiguous byte ranges, never across a record. Up to `--input-shards` producers independently hash records into bucket shards. The consumer reads the shards in source-file/range order, preserving multi-PAF cumulative best-target behavior and the original order of records belonging to a read.
+- **BAM:** Existing chromosome-window scans are divided into ordered groups. Each producer writes directly to per-read-name bucket shards; it does not write task TSVs that a main-process redistributor must then reread and rehash. Original per-window query overwrites and high-MAPQ union remain intact.
+- **Final filtering and coverage:** Identical to `partitioned-v2`; binary intervals, per-window events and prefix sums are unchanged.
+
+The new `--input-shards` parameter defaults to **16** and controls PAF and BAM producer shard count (bounded by input size/number of BAM windows). It is distinct from `--partitions 256` (logical read-name buckets). Producer shards multiply temporary file count, so evaluate on node-local SSD/NVMe rather than assuming more shards or CPU is always better.
+
+### MF2 comparison
+
+First run `python -m unittest discover -s tests -v`. Then run the previously verified MF2 command, changing only the backend and output directory:
+
+```bash
+--filter-backend partitioned-v3 --input-shards 16 --partitions 256 -t 16 -d test6
+```
+
+Enable `GCI_PROFILE=1`, retain the same scratch location, and compare all outputs with `test5` (`partitioned-v2`) after decompressing depth files. Treat `partitioned-v2` as the verified fallback. Phase 2D may be slower on shared storage or when bucket-shard metadata dominates: **MF2 performance is not yet measured**.
 
 ## Algorithm
 
