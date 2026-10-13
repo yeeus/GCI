@@ -102,11 +102,21 @@ class PartitionedBackendTests(unittest.TestCase):
                         scratch_dir=outdir,
                         partitions=partitions,
                     )
+                    phase2d, phase2d_targets = gci.filter(
+                        paf_files=pafs[:paf_count], bam_files=[bam],
+                        directory=outdir, prefix=f'v3_{paf_count}',
+                        threads=threads, flank_len=15,
+                        filter_backend='partitioned-v3',
+                        scratch_dir=outdir, partitions=partitions,
+                        input_shards=4,
+                    )
                     self.assertEqual(legacy_targets, optimized_targets)
                     self.assertEqual(legacy_targets, phase2c_targets)
+                    self.assertEqual(legacy_targets, phase2d_targets)
                     for chrom in legacy_targets:
                         np.testing.assert_array_equal(optimized[chrom], legacy[chrom])
                         np.testing.assert_array_equal(phase2c[chrom], legacy[chrom])
+                        np.testing.assert_array_equal(phase2d[chrom], legacy[chrom])
                     with gzip.open(os.path.join(outdir, legacy_prefix + '.depth.gz'), 'rb') as f:
                         a = f.read()
                     with gzip.open(os.path.join(outdir, new_prefix + '.depth.gz'), 'rb') as f:
@@ -115,6 +125,9 @@ class PartitionedBackendTests(unittest.TestCase):
                     with gzip.open(os.path.join(outdir, f'v2_{paf_count}.depth.gz'), 'rb') as f:
                         c = f.read()
                     self.assertEqual(a, c)
+                    with gzip.open(os.path.join(outdir, f'v3_{paf_count}.depth.gz'), 'rb') as f:
+                        d = f.read()
+                    self.assertEqual(a, d)
                     self.assertEqual(
                         gci.collapse_depth_range(legacy, -1, 0, 15),
                         gci.collapse_depth_range(optimized, -1, 0, 15),
@@ -122,6 +135,10 @@ class PartitionedBackendTests(unittest.TestCase):
                     self.assertEqual(
                         gci.collapse_depth_range(legacy, -1, 0, 15),
                         gci.collapse_depth_range(phase2c, -1, 0, 15),
+                    )
+                    self.assertEqual(
+                        gci.collapse_depth_range(legacy, -1, 0, 15),
+                        gci.collapse_depth_range(phase2d, -1, 0, 15),
                     )
             # Multiple BAM inputs use the same union/overlap semantics.
             second_bam = os.path.join(outdir, 'second.bam')
@@ -146,9 +163,18 @@ class PartitionedBackendTests(unittest.TestCase):
                 filter_backend='partitioned-v2',
                 scratch_dir=outdir, partitions=7,
             )
+            phase2d, _ = gci.filter(
+                paf_files=pafs[:1], bam_files=[bam, second_bam],
+                directory=outdir, prefix='phase2d_two_bams',
+                threads=2, flank_len=15,
+                filter_backend='partitioned-v3',
+                scratch_dir=outdir, partitions=7,
+                input_shards=4,
+            )
             for chrom in legacy:
                 np.testing.assert_array_equal(legacy[chrom], optimized[chrom])
                 np.testing.assert_array_equal(legacy[chrom], phase2c[chrom])
+                np.testing.assert_array_equal(legacy[chrom], phase2d[chrom])
             self.assertFalse(any(name.startswith('gci-part-') for name in os.listdir(outdir)))
 
 
