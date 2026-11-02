@@ -205,9 +205,9 @@ def filter(paf_files=[], bam_files=[], prefix=None, map_qual=30, mq_cutoff=50, i
 
 	for file in output_files_name:
 		random_string = ''.join(random.choices(string.ascii_letters + string.digits, k=10))
-		subprocess.run(f'samtools sort {file} -o {directory}/{random_string}.bam', shell=True, capture_output=True, check=True)
-		subprocess.run(f'mv {directory}/{random_string}.bam {file}', shell=True, capture_output=True, check=True)
-		subprocess.run(f'samtools index {file}', shell=True, capture_output=True, check=True)
+		subprocess.run(['samtools', 'sort', file, '-o', f'{directory}/{random_string}.bam'], capture_output=True, check=True)
+		subprocess.run(['mv', f'{directory}/{random_string}.bam', file], capture_output=True, check=True)
+		subprocess.run(['samtools', 'index', file], capture_output=True, check=True)
 
 	return output_files_name
 
