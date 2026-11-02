@@ -7,209 +7,184 @@ import os
 import random
 import string
 
+# Reuse the partitioning and alignment-scoring primitives from GCI v1.1.
+# The repository root must contain gci_partitioned.py and gci_depth_events.py.
+from pathlib import Path
+from multiprocessing import get_context
+import sqlite3
+import tempfile
 
-def get_average_identity(alns):
-	"""
-	usage: get average identity if there are many alignment blocks of one target 
-
-	input: synteny[query][target] from function filter()
-
-	return: the average identity
-	"""
-
-	tmp = []
-	for a in alns:
-		tmp.append(a[-1])
-	average = sum(tmp) / len(alns)
-	return average
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from gci_partitioned import _BucketWriter, _bam_task, _paf_best_target
 
 
-def merge_alns_properties(alns, x, y):
-	"""
-	usage: merge overlapped aligned blocks of either query or target based on the inputted parameters x and y
-
-	input: ynteny[query][target] from function filter(),
-		   query (1, 2) or target (3, 4)
-
-	return: mapped_length of the query (inputting 1, 2), the lowest and highest position of target (inputting 3, 4)
-	"""
-
-	# extract bed list form alns
-	bed_list = []
-	for a in alns:
-		bed_list.append([a[x], a[y]])
-	sort_bed_list = sorted(bed_list)
-	# merge bed to generate non-overlap blocks
-	
-	target_length = []
-	mapped_length = 0
-	low_est = sort_bed_list[0][0]
-	high_est = sort_bed_list[0][1]
-
-	for index, block in enumerate(sort_bed_list):
-		low, high = block
-		if high_est >= low:
-			if high_est < high:
-				high_est = high
-		else:
-			target_length.append((high_est-low_est, low_est, high_est))
-			mapped_length += (high_est - low_est)
-			low_est, high_est = sort_bed_list[index]
-	target_length.append((high_est-low_est, low_est, high_est))
-	mapped_length += (high_est - low_est)
-
-	target_length = sorted(target_length, key=lambda x:x[0], reverse=True)
-	return mapped_length, target_length[0][1], target_length[0][2]
 
 
-def filter(paf_files=[], bam_files=[], prefix=None, map_qual=30, mq_cutoff=50, iden_percent=0.9, clip_percent=0.1, ovlp_percent=0.9, directory='.', force=False):
-	"""
-	usage: filter the paf and bam file(s) based on many metrics and output the filtered bam file(s)
+def _selected_bucket(task):
+    """Resolve one Phase 2C read-name partition and retain query identifiers."""
+    bucket, root, n_paf, n_bam, targets, map_qual, mq_cutoff, identity_min, ovlp_min = task
+    root = Path(root)
+    high_quality = set()
+    synteny = {}
+    paf_maps = [{} for _ in range(n_paf)]
+    paf_path = root / f'paf.{bucket:04d}.tsv'
+    current_file = 0
+    if paf_path.exists():
+        with open(paf_path) as src:
+            for line in src:
+                parts = line.rstrip('\n').split('\t')
+                file_id = int(parts[0])
+                while current_file < file_id:
+                    paf_maps[current_file] = _paf_best_target(synteny)
+                    current_file += 1
+                paf = parts[1:]
+                target = paf[5]
+                if target not in targets:
+                    continue
+                qname = paf[0]
+                qlen, qs, qe = int(paf[1]), int(paf[2]), int(paf[3])
+                ts, te = int(paf[7]), int(paf[8])
+                identity = int(paf[9]) / int(paf[10])
+                mapq = int(paf[11])
+                if mapq >= map_qual and identity >= identity_min:
+                    synteny.setdefault(qname, {}).setdefault(target, []).append(
+                        (qlen, qs, qe, ts, te, identity)
+                    )
+                    if mapq >= mq_cutoff:
+                        high_quality.add(qname)
+    for file_id in range(current_file, n_paf):
+        paf_maps[file_id] = _paf_best_target(synteny)
 
-	input: paf file(s),
-		   bam file(s),
-		   the filtered mapping quality,
-		   the cutoff of mapping quality,
-		   the filtered identity percentage,
-		   the filtered clipped percentage (S / (M + I + S)),
-		   the filtered overlapping percentage (overlap/length),
-		   the path to output,
-		   whether to rewrite the existing files (force)
-	
-	output: the filtered bam file(s)
+    del synteny
+    bam_maps = []
+    for file_id in range(n_bam):
+        reads = {}
+        bam_path = root / f'bam{file_id}.{bucket:04d}.tsv'
+        if bam_path.exists():
+            with open(bam_path) as src:
+                for line in src:
+                    qname, chrom, start, end, qlen, high = line.rstrip('\n').split('\t')
+                    reads[qname] = (chrom, int(start), int(end), int(qlen))
+                    if high == '1':
+                        high_quality.add(qname)
+        bam_maps.append(reads)
 
-	return: the file names of the filtered bam file(s)
-	"""
-	
-	output_files = []
-	output_files_name = []
-	samfile = pysam.AlignmentFile(bam_files[0], 'rb')
-	for i, file in enumerate(bam_files):
-		if prefix == None:
-			if os.path.exists(f'{directory}/{".".join(file.split(".")[:-1])}.filter.bam') and force == False:
-				print(f'ERROR!!! The file "{directory}/{".".join(file.split(".")[:-1])}.filter.bam" exists\nPlease using "-f" or "--force" to rewrite', file=sys.stderr)
-				raise SystemExit
-			output_files_name.append(f'{directory}/{".".join(file.split(".")[:-1])}.filter.bam')
-			f = pysam.AlignmentFile(f'{directory}/{".".join(file.split(".")[:-1])}.filter.bam', 'wb', template=samfile)
-		else:
-			if os.path.exists(f'{directory}/{prefix[i]}.bam') and force == False:
-				print(f'ERROR!!! The file "{directory}/{prefix[i]}.bam" exists\nPlease using "-f" or "--force" to rewrite', file=sys.stderr)
-				raise SystemExit
-			output_files_name.append(f'{directory}/{prefix[i]}.bam')
-			f = pysam.AlignmentFile(f'{directory}/{prefix[i]}.bam', 'wb', template=samfile)
-		output_files.append(f)
-	samfile.close()
+    files = paf_maps + bam_maps
+    if len(files) > 1:
+        common = set.intersection(*(set(f) for f in files))
+        final = high_quality | common
+        selected = {q: v for q, v in files[0].items() if q in final}
+        for mapping in files[1:]:
+            for q, segment in mapping.items():
+                if q in selected:
+                    previous = selected[q]
+                    if segment[0] == previous[0]:
+                        overlap = min(segment[2], previous[2]) - max(segment[1], previous[1])
+                        if overlap / segment[-1] < ovlp_min:
+                            del selected[q]
+                        else:
+                            selected[q] = (previous[0], max(segment[1], previous[1]), min(segment[2], previous[2]))
+                    else:
+                        del selected[q]
+                elif q in high_quality:
+                    selected[q] = (segment[0], segment[1], segment[2])
+    else:
+        selected = files[0]
 
-
-	high_qual_querys = set()
-	paf_lines = [{} for i in range(len(paf_files))]
-	if len(paf_files) != 0:
-		synteny = {}
-		for i, file in enumerate(paf_files):
-			with open(file, 'r') as f:
-				for line in f:
-					paf = line.strip().split("\t")
-					query = paf[0]
-					query_length = int(paf[1])
-					query_start = int(paf[2])
-					query_end = int(paf[3])
-					target = paf[5]
-					target_start = int(paf[7])
-					target_end = int(paf[8])
-					num_match_res = int(paf[9])
-					len_aln = int(paf[10])
-					mapq = int(paf[11])
-					
-					identity = num_match_res/len_aln
-					if (mapq >= map_qual) and (identity >= iden_percent):
-						if query not in synteny.keys():
-							synteny[query] = {}
-						if target not in synteny[query].keys():
-							synteny[query][target] = []
-						synteny[query][target].append((query_length, query_start, query_end, target_start, target_end, identity))
-						if mapq >= mq_cutoff:
-							high_qual_querys.add(query)
-				for query in synteny.keys():
-					mapping_results = {}
-					for target in synteny[query].keys():
-						alns = synteny[query][target]
-						non_overlap_qry_aligned, _, _ = merge_alns_properties(alns, 1, 2)
-						query_length = alns[0][0]
-						alignrate = non_overlap_qry_aligned / query_length
-						average_identity = get_average_identity(alns)
-						score = average_identity * alignrate
-						_, start, end = merge_alns_properties(alns, 3, 4)
-						mapping_results[target] = (score, start, end, query_length)
-					primary_target = sorted(mapping_results, key=lambda k: (mapping_results[k][0], k), reverse=True)[0]
-					primary_target_result = mapping_results[primary_target]
-					paf_lines[i][query] = (primary_target, primary_target_result[1], primary_target_result[2], primary_target_result[-1])
+    out_path = root / f'selected.{bucket:04d}.tsv'
+    with open(out_path, 'w') as out:
+        for qname, segment in selected.items():
+            out.write(f'{qname}\t{segment[0]}\t{segment[1]}\t{segment[2]}\n')
+    return str(out_path)
 
 
-	samfile_dicts = [{} for i in range(len(bam_files))]
-	for i, file in enumerate(bam_files):
-		samfile = pysam.AlignmentFile(file, 'rb')
-		for segment in samfile.fetch():
-			if (segment.is_mapped == True) and (segment.is_secondary == False) and (segment.is_supplementary == False) and (segment.mapping_quality >= map_qual):
-				M = segment.get_cigar_stats()[0][0]
-				I = segment.get_cigar_stats()[0][1]
-				D = segment.get_cigar_stats()[0][2]
-				S = segment.get_cigar_stats()[0][4]
-				NM = segment.get_tag('NM')
-				mm = NM - (I + D)
-				if (S/(M+I+S) <= clip_percent) and ((M-mm)/(M+I+D) >= iden_percent):
-					samfile_dicts[i][segment.query_name] = (segment.reference_name, segment.reference_start, segment.reference_end, segment.query_length)
-					if segment.mapping_quality >= mq_cutoff:
-						high_qual_querys.add(segment.query_name)
-		samfile.close()
+def filter(paf_files=[], bam_files=[], prefix=None, map_qual=30, mq_cutoff=50,
+           iden_percent=0.9, clip_percent=0.1, ovlp_percent=0.9,
+           directory='.', force=False, threads=1, partitions=256):
+    """Write filtered BAMs using GCI v1.1 Phase 2C read selection."""
+    if threads < 1 or partitions < 1:
+        raise ValueError('threads and partitions must both be >= 1')
+    output_files_name = [
+        os.path.join(directory, f'{prefix[i]}.bam' if prefix is not None
+                     else f'{os.path.basename(path)[:-4]}.filter.bam')
+        for i, path in enumerate(bam_files)
+    ]
+    for path in output_files_name:
+        if os.path.exists(path) and not force:
+            raise SystemExit(f'ERROR!!! The file "{path}" exists\nPlease use "-f" or "--force" to rewrite')
 
+    with pysam.AlignmentFile(bam_files[0], 'rb') as bam:
+        targets = dict(zip(bam.references, bam.lengths))
 
-	files = paf_lines + samfile_dicts
-	if len(files) > 1:
-		files_sets = []
-		for file in files:
-			files_sets.append(set(file.keys()))
-		comm_querys = set.intersection(*files_sets)
+    with tempfile.TemporaryDirectory(prefix='gci-part-', dir=directory) as root:
+        with _BucketWriter(root, 'paf', partitions) as writer:
+            for i, path in enumerate(paf_files):
+                with open(path) as source:
+                    for line in source:
+                        writer.write(line.split('\t', 1)[0], str(i) + '\t' + line)
 
-		final_querys = high_qual_querys | comm_querys
-		file1 = {query:segment for query, segment in files[0].items() if query in final_querys}
-		for file in files[1:]:
-			for query, segment in file.items():
-				if query in file1.keys():
-					segment1 = file1[query]
-					if segment[0] == segment1[0]:
-						start1 = segment[1]
-						end1 = segment[2]
-						start2 = segment1[1]
-						end2 = segment1[2]
+        for file_id, bam_path in enumerate(bam_files):
+            tasks = []
+            for target, length in targets.items():
+                step = 1 + (length - 1) // threads
+                for left in range(0, length, step):
+                    tasks.append((len(tasks), target, left, min(left + step, length),
+                                  bam_path, map_qual, clip_percent,
+                                  iden_percent, mq_cutoff, root))
+            with _BucketWriter(root, f'bam{file_id}', partitions) as writer:
+                if tasks:
+                    with get_context('fork').Pool(processes=min(threads, len(tasks))) as pool:
+                        for path, count in pool.imap(_bam_task, tasks, chunksize=1):
+                            with open(path) as source:
+                                for line in source:
+                                    writer.write(line.split('\t', 1)[0], line)
+                            os.remove(path)
 
-						ovlp = min(end1, end2) - max(start1, start2)
-						if ovlp/segment[-1] < ovlp_percent:
-							del file1[query]
-						else:
-							file1[query] = (segment1[0], max(start1, start2), min(end1, end2))
-					else:
-						del file1[query]
-				elif query in high_qual_querys:
-					file1.update({query:(segment[0], segment[1], segment[2])})
-	else:
-		file1 = files[0]
-	for i, bamfile in enumerate(bam_files):
-		samfile = pysam.AlignmentFile(bamfile, 'rb')
-		for query, segment in file1.items():
-			for segment1 in samfile.fetch(segment[0], segment[1], segment[2]):
-				if (segment1.query_name == query) and (segment1.is_mapped == True) and (segment1.is_secondary == False) and (segment1.is_supplementary == False) and (segment1.mapping_quality >= map_qual):
-					output_files[i].write(segment1)
-					break
-		samfile.close()
-		output_files[i].close()
+        worker_tasks = [
+            (bucket, root, len(paf_files), len(bam_files), targets,
+             map_qual, mq_cutoff, iden_percent, ovlp_percent)
+            for bucket in range(partitions)
+        ]
+        with sqlite3.connect(Path(root) / 'selected.sqlite') as db:
+            db.execute('CREATE TABLE selected (query TEXT PRIMARY KEY, chrom TEXT, '
+                       'start INTEGER, end INTEGER, emitted INTEGER DEFAULT -1)')
+            with get_context('fork').Pool(processes=min(threads, partitions)) as pool:
+                for path in pool.imap_unordered(_selected_bucket, worker_tasks, chunksize=1):
+                    with open(path) as source:
+                        db.executemany(
+                            'INSERT INTO selected (query, chrom, start, end) VALUES (?, ?, ?, ?)',
+                            (line.rstrip('\n').split('\t') for line in source),
+                        )
+                    os.remove(path)
+            db.commit()
 
-	for file in output_files_name:
-		random_string = ''.join(random.choices(string.ascii_letters + string.digits, k=10))
-		subprocess.run(['samtools', 'sort', file, '-o', f'{directory}/{random_string}.bam'], capture_output=True, check=True)
-		subprocess.run(['mv', f'{directory}/{random_string}.bam', file], capture_output=True, check=True)
-		subprocess.run(['samtools', 'index', file], capture_output=True, check=True)
+            for file_id, bam_path in enumerate(bam_files):
+                with pysam.AlignmentFile(bam_path, 'rb') as bam:
+                    with pysam.AlignmentFile(output_files_name[file_id], 'wb', template=bam) as out:
+                        for aln in bam.fetch(until_eof=True):
+                            if (aln.is_unmapped or aln.is_secondary or aln.is_supplementary
+                                    or aln.mapping_quality < map_qual):
+                                continue
+                            hit = db.execute(
+                                'SELECT chrom, start, end FROM selected WHERE query=? AND emitted!=?',
+                                (aln.query_name, file_id),
+                            ).fetchone()
+                            if (hit is not None and aln.reference_name == hit[0]
+                                    and aln.reference_start < hit[2]
+                                    and aln.reference_end > hit[1]):
+                                out.write(aln)
+                                db.execute('UPDATE selected SET emitted=? WHERE query=?',
+                                           (file_id, aln.query_name))
+                db.commit()
 
-	return output_files_name
+    for path in output_files_name:
+        random_string = ''.join(random.choices(string.ascii_letters + string.digits, k=10))
+        sorted_path = os.path.join(directory, f'{random_string}.bam')
+        subprocess.run(['samtools', 'sort', path, '-o', sorted_path], capture_output=True, check=True)
+        subprocess.run(['mv', sorted_path, path], capture_output=True, check=True)
+        subprocess.run(['samtools', 'index', path], capture_output=True, check=True)
+    return output_files_name
+
 
 
 def bamsnap(files=[], output_files=[], reference=None, region=None, regions_file=None, directory='.', prefix='bamsnap', force=False):
@@ -256,9 +231,9 @@ def bamsnap(files=[], output_files=[], reference=None, region=None, regions_file
 		subprocess.run(f'bamsnap -bam {bam_argument} -title {title_arguments} -bed {regions_file} -margin 100 -out {directory}/{prefix} -save_image_only -ref {reference} -draw coordinates bamplot base -bamplot coverage read -read_color_by strand', shell=True, check=True)
 
 
-def preprocessing(files=[], directory='.', prefix='bamsnap', threads=1, map_qual=30, mq_cutoff=50, iden_percent=0.9, ovlp_percent=0.9, clip_percent=0.1, plot=False, reference=None, region=None, regions_file=None, force=False):
+def preprocessing(files=[], directory='.', prefix='bamsnap', threads=1, partitions=256, map_qual=30, mq_cutoff=50, iden_percent=0.9, ovlp_percent=0.9, clip_percent=0.1, plot=False, reference=None, region=None, regions_file=None, force=False):
 	if directory.endswith('/'):
-		directory = directory.split('/')[0]
+		directory = directory.rstrip('/') or '.'
 	if os.path.exists(directory):
 		if not os.access(directory, os.R_OK):
 			print(f'ERROR!!! The path "{directory}" is unable to read', file=sys.stderr)
@@ -283,27 +258,26 @@ def preprocessing(files=[], directory='.', prefix='bamsnap', threads=1, map_qual
 		if isinstance(prefix, str):
 			prefix = [prefix]
 		if len(prefix) == 1:
-			output_files_name = filter(paf_files, bam_files, None, map_qual, mq_cutoff, iden_percent, clip_percent, ovlp_percent, directory, force)
+			output_files_name = filter(paf_files, bam_files, None, map_qual, mq_cutoff, iden_percent, clip_percent, ovlp_percent, directory, force, threads, partitions)
 		else:
-			output_files_name = filter(paf_files, bam_files, prefix[:-1], map_qual, mq_cutoff, iden_percent, clip_percent, ovlp_percent, directory, force)
+			output_files_name = filter(paf_files, bam_files, prefix[:-1], map_qual, mq_cutoff, iden_percent, clip_percent, ovlp_percent, directory, force, threads, partitions)
 		bamsnap(bam_files, output_files_name, reference, region, regions_file, directory, prefix[-1], force)
 	else:
 		if isinstance(prefix, str):
-			output_files_name = filter(paf_files, bam_files, None, map_qual, mq_cutoff, iden_percent, clip_percent, ovlp_percent, directory, force)
+			output_files_name = filter(paf_files, bam_files, None, map_qual, mq_cutoff, iden_percent, clip_percent, ovlp_percent, directory, force, threads, partitions)
 		else:
-			output_files_name = filter(paf_files, bam_files, prefix, map_qual, mq_cutoff, iden_percent, clip_percent, ovlp_percent, directory, force)
+			output_files_name = filter(paf_files, bam_files, prefix, map_qual, mq_cutoff, iden_percent, clip_percent, ovlp_percent, directory, force, threads, partitions)
 
 
 if __name__=='__main__':
-	###! this version can't plot and use multiple threads (-t)
-
 	parser = argparse.ArgumentParser(prog=sys.argv[0], add_help=False, formatter_class=argparse.RawDescriptionHelpFormatter, description='This is the core part of the main program GCI.py with additional functions\nYou can provide some bam and paf files (like GCI.py) and set the filtered parameters\nand then you will get the filtered bam file which can be used for subsequent analysis', epilog='Examples:\npython filter_bam.py bam1 paf1 ...')
 
 	group_io = parser.add_argument_group("Input/Output")
 	group_io.add_argument('files', nargs='+', metavar='ALIGNMENT-FILE', help='Long reads alignment files (at least one bam file)')
 	group_io.add_argument('-d', dest='directory', metavar='PATH', help='The directory of output files [.]', default='.')
 	group_io.add_argument('-o', '--output', nargs='*', dest='prefix', metavar='STR', help='Prefix of output files; one prefix corresponds to one bam file in order and if provide the parameter "-p", the last one is used as the prefix for bamsnap outputs (output directory if inputting the regions file) [[$input.filter] for filtered bam files and [bamsnap] for bamsnap outputs]', default='bamsnap')
-	#group_io.add_argument('-t', '--threads', metavar='INT', type=int, help='Number of threads [1]', default=1)
+	group_io.add_argument('-t', '--threads', metavar='INT', type=int, help='Number of worker processes [1]', default=1)
+	group_io.add_argument('--partitions', metavar='INT', type=int, help='Number of read-name partitions [256]', default=256)
 
 	group_fo = parser.add_argument_group("Filter Options")
 	group_fo.add_argument('-mq', '--map-qual', metavar='INT', type=int, help='Minium mapping quality for alignments [30]', default=30)
